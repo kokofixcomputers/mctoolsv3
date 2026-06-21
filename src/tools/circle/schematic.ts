@@ -1,67 +1,97 @@
 import { NbtWriter, varint, gzip } from './nbtWriter'
 
-// WorldEdit Sponge Schematic v2
-// https://github.com/EngineHub/WorldEdit/blob/master/worldedit-core/src/main/java/com/sk89q/worldedit/extent/clipboard/io/SpongeSchematicWriter.java
+// Sponge Schematic Version 3
+// https://github.com/SpongePowered/Schematic-Specification/blob/master/versions/schematic-3.md
+//
+// Root NBT layout:
+//   TAG_Compound("") {
+//     TAG_Compound("Schematic") {
+//       Version = 3
+//       DataVersion
+//       Metadata { ... }
+//       Width / Height / Length
+//       Offset
+//       Blocks {          <-- Block Container (new in v3)
+//         Palette { blockstate → index }
+//         Data    varint[]
+//         BlockEntities []
+//       }
+//       Entities []
+//     }
+//   }
+
+// Minecraft Java data versions (needed by importing tools)
+const DATA_VERSIONS: Record<string, number> = {
+  '1.21.1':  3953,
+  '1.21.4':  4189,
+  '1.21.5':  4325,
+}
+function dataVersion(mcVersion?: string): number {
+  return (mcVersion ? DATA_VERSIONS[mcVersion] : undefined) ?? 3953
+}
 
 export interface SchematicOptions {
-  grid: boolean[]        // flat row-major (z outer, x inner) boolean array
-  width: number          // X
-  height: number         // Y (always 1 for flat circle)
-  length: number         // Z
-  blockId: string        // e.g. "minecraft:stone"
+  grid: boolean[]     // flat row-major (z outer, x inner) boolean array
+  width: number       // X
+  height: number      // Y (always 1 for flat circle)
+  length: number      // Z
+  blockId: string     // e.g. "minecraft:stone"
   name?: string
+  mcVersion?: string  // e.g. "1.21.5"
 }
 
 export async function buildSchematic(opts: SchematicOptions): Promise<Uint8Array> {
-  const { grid, width, height, length, blockId, name = 'Circle' } = opts
+  const { grid, width, height, length, blockId, name = 'Circle', mcVersion } = opts
 
-  // Palette: 0 = air, 1 = chosen block
   const airId = 'minecraft:air'
-  const blockCount = width * height * length
 
-  // BlockData: varint-encoded palette indices
-  // Sponge v2 index order: y * width * length + z * width + x
-  // For height=1 (y=0): index = z * width + x
+  // Encode block data as varint[] in index order: x + z * Width + y * Width * Length
   const blockDataArr: number[] = []
-  for (let z = 0; z < length; z++) {
-    for (let x = 0; x < width; x++) {
-      // Our grid is stored as y outer, x inner (row-major 2D)
-      // grid[y * W + x] but we treat y→z for the horizontal plane
-      const idx = z * width + x
-      const paletteIdx = grid[idx] ? 1 : 0
-      blockDataArr.push(...varint(paletteIdx))
+  for (let y = 0; y < height; y++) {
+    for (let z = 0; z < length; z++) {
+      for (let x = 0; x < width; x++) {
+        const paletteIdx = grid[z * width + x] ? 1 : 0
+        blockDataArr.push(...varint(paletteIdx))
+      }
     }
   }
 
+  const now = Date.now()
+  const dateHi = Math.floor(now / 0x100000000)
+  const dateLo = now >>> 0
+
   const w = new NbtWriter()
-  w.compound('Schematic', () => {
-    w.int('Version', 2)
-    w.int('DataVersion', 3953)  // 1.21.1
 
-    w.compound('Metadata', () => {
-      w.string('Name', name)
-      w.string('Author', 'MCTools v3')
-      w.long('Date', 0, Date.now())
-      w.emptyList('RequiredMods', 8) // list of strings
+  // Root unnamed compound — required by NBT file format and the spec
+  w.compound('', () => {
+    w.compound('Schematic', () => {
+      w.int('Version', 3)
+      w.int('DataVersion', dataVersion(mcVersion))
+
+      w.compound('Metadata', () => {
+        w.string('Name', name)
+        w.string('Author', 'MCTools')
+        w.long('Date', dateHi, dateLo)
+        w.emptyList('RequiredMods', 8) // TAG_String list
+      })
+
+      w.short('Width',  width)
+      w.short('Height', height)
+      w.short('Length', length)
+      w.intArray('Offset', [0, 0, 0])
+
+      // Block Container (v3: Palette + Data + BlockEntities nested here)
+      w.compound('Blocks', () => {
+        w.compound('Palette', () => {
+          w.int(airId,  0)
+          w.int(blockId, 1)
+        })
+        w.byteArray('Data', blockDataArr)
+        w.emptyList('BlockEntities') // TAG_Compound list
+      })
+
+      w.emptyList('Entities') // TAG_Compound list, at Schematic root per spec
     })
-
-    w.short('Width', width)
-    w.short('Height', height)
-    w.short('Length', length)
-
-    w.intArray('Offset', [0, 0, 0])
-
-    w.int('PaletteMax', 2)
-
-    w.compound('Palette', () => {
-      w.int(airId, 0)
-      w.int(blockId, 1)
-    })
-
-    w.byteArray('BlockData', blockDataArr)
-
-    w.emptyList('BlockEntities')
-    w.emptyList('Entities')
   })
 
   return gzip(w.bytes())

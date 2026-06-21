@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useVersion } from '../contexts/VersionContext'
 import { ZoomIn, ZoomOut, Maximize2, Download } from 'lucide-react'
 import { generateShape, rowCounts, colCounts, totalBlocks, type ShapeType, type FillMode } from '../tools/circle/circleGen'
 import { buildSchematic, downloadBlob } from '../tools/circle/schematic'
@@ -101,6 +102,7 @@ const SHAPES: { id: ShapeType; label: string }[] = [
 const PRESETS = [16, 32, 64, 128]
 
 export default function CirclePage() {
+  const { version } = useVersion()
   const [shape, setShape]   = useState<ShapeType>('circle')
   const [mode, setMode]     = useState<FillMode>('outline')
   const [width, setWidth]   = useState(21)
@@ -184,6 +186,7 @@ export default function CirclePage() {
       const data = await buildSchematic({
         grid, width, height: 1, length: effectiveH,
         blockId, name: `${shape} ${width}x${effectiveH}`,
+        mcVersion: version.id,
       })
       downloadBlob(data, `${shape}_${width}x${effectiveH}.schem`)
     } finally {
