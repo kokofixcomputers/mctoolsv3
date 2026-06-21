@@ -122,6 +122,15 @@ export const TOOLS: ToolDef[] = [
     badge: 'New',
   },
   {
+    id: 'achievement',
+    path: '/achievement',
+    title: 'Achievement Generator',
+    desc: 'Create Minecraft-style achievement and advancement toast images with pixel font, custom icon, and multiple styles.',
+    category: 'Creative',
+    tags: ['achievement', 'advancement', 'toast', 'image', 'generator', 'pixel', 'font', 'meme'],
+    badge: 'New' as const,
+  },
+  {
     id: 'nbt',
     path: '/nbt',
     title: 'NBT Editor',
@@ -129,6 +138,15 @@ export const TOOLS: ToolDef[] = [
     category: 'Files',
     tags: ['nbt', 'binary', 'editor', 'compound', 'tag', 'minecraft', 'file'],
     badge: 'New',
+  },
+  {
+    id: 'mc-text',
+    path: '/mc-text',
+    title: '3D Minecraft Text',
+    desc: 'Generate 3D Minecraft-style title text with block and cracked textures. Download as a transparent PNG.',
+    category: 'Creative',
+    tags: ['text', '3d', 'title', 'font', 'texture', 'generator', 'block', 'cracked', 'logo'],
+    badge: 'New' as const,
   },
   {
     id: 'superflat',

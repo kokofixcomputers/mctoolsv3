@@ -95,13 +95,31 @@ export function mcAssetsPlugin(): Plugin {
         const srcBase = path.join(DATA_ROOT, resolveVersion(appVer))
         const dstBase = path.join(outDir, 'mc-assets', appVer)
 
+        // Flat directories
         for (const type of ['blocks', 'items']) {
           const src = path.join(srcBase, type)
           const dst = path.join(dstBase, type)
           await fsp.mkdir(dst, { recursive: true })
-
           const files = await fsp.readdir(src)
           await Promise.all(files.map(f => fsp.copyFile(path.join(src, f), path.join(dst, f))))
+        }
+
+        // GUI sprite subdirectories needed by the achievement generator
+        const guiSpriteDirs = [
+          'gui/sprites/toast',
+          'gui/sprites/advancements',
+        ]
+        for (const rel of guiSpriteDirs) {
+          const src = path.join(srcBase, rel)
+          const dst = path.join(dstBase, rel)
+          if (!fs.existsSync(src)) continue
+          await fsp.mkdir(dst, { recursive: true })
+          const files = await fsp.readdir(src)
+          await Promise.all(
+            files
+              .filter(f => f.endsWith('.png'))
+              .map(f => fsp.copyFile(path.join(src, f), path.join(dst, f)))
+          )
         }
       }))
 
