@@ -1,4 +1,5 @@
 import { interpolateColors, type GradientType } from '../gradient/gradient'
+import type { RichLine, TextSegment } from '../../types/richText'
 
 export type MotdFormat = 'vanilla' | 'paper' | 'velocity' | 'simplemotd' | 'legacy'
 
@@ -73,6 +74,68 @@ export function buildMotd(
       return rendered.map((l, i) => `line${i + 1}: "${l.replace(/"/g, '\\"')}"`).join('\n')
     case 'legacy':
       return joined
+  }
+}
+
+function segToLegacy(seg: TextSegment): string {
+  let codes = '§r'
+  if (seg.obfuscated) codes += '§k'
+  if (seg.bold) codes += '§l'
+  if (seg.strikethrough) codes += '§m'
+  if (seg.underlined) codes += '§n'
+  if (seg.italic) codes += '§o'
+  if (seg.color) {
+    const h = seg.color.replace('#', '')
+    codes += `§x§${h[0]}§${h[1]}§${h[2]}§${h[3]}§${h[4]}§${h[5]}`
+  }
+  return codes + seg.text
+}
+
+function segToMiniMessage(seg: TextSegment): string {
+  let s = seg.text
+  if (seg.color) s = `<${seg.color}>${s}</${seg.color}>`
+  if (seg.bold) s = `<bold>${s}</bold>`
+  if (seg.italic) s = `<italic>${s}</italic>`
+  if (seg.underlined) s = `<underlined>${s}</underlined>`
+  if (seg.strikethrough) s = `<strikethrough>${s}</strikethrough>`
+  if (seg.obfuscated) s = `<obfuscated>${s}</obfuscated>`
+  return s
+}
+
+function richLineToString(line: RichLine, mini: boolean, center: boolean, lineWidth = 53): string {
+  if (!line.length) return ''
+  const encoded = mini
+    ? line.map(segToMiniMessage).join('')
+    : line.map(segToLegacy).join('')
+  if (!mini && center) {
+    const plain = line.map(s => s.text).join('')
+    const pad = Math.max(0, Math.floor((lineWidth - plain.length) / 2))
+    return ' '.repeat(pad) + encoded
+  }
+  return encoded
+}
+
+export function buildMotdFromRich(
+  lines: Array<{ segments: RichLine; center: boolean }>,
+  format: MotdFormat,
+  centerAll: boolean,
+): string {
+  const mini = format === 'velocity' || format === 'paper' || format === 'simplemotd'
+  const rendered = lines.map(l => richLineToString(l.segments, mini, centerAll || l.center))
+
+  switch (format) {
+    case 'vanilla':
+      return `motd=${rendered.join('\\n')}`
+    case 'paper': {
+      const yamlLines = rendered.map(l => `  - "${l.replace(/"/g, '\\"')}"`)
+      return `motd:\n${yamlLines.join('\n')}`
+    }
+    case 'velocity':
+      return `motd: "${rendered.join('\\n').replace(/"/g, '\\"')}"`
+    case 'simplemotd':
+      return rendered.map((l, i) => `line${i + 1}: "${l.replace(/"/g, '\\"')}"`).join('\n')
+    case 'legacy':
+      return rendered.join('\n')
   }
 }
 
