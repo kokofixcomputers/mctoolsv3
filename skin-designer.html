@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MC Skin Designer</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f2f2f2;
+  --surface: #ffffff;
+  --border: #e0e0e0;
+  --border2: #d0d0d0;
+  --text: #1a1a1a;
+  --text2: #666;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --toolbar-w: 48px;
+  --panel-w: 280px;
+  --topbar-h: 54px;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+/* ── Top Bar ── */
+.topbar {
+  height: var(--topbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.logo-icon {
+  width: 28px; height: 28px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+.logo span.brand { color: var(--accent); }
+
+.divider-v { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
+
+.icon-btn {
+  width: 30px; height: 30px;
+  border: none; background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text2);
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+.icon-btn:hover { background: var(--bg); color: var(--text); }
+.icon-btn:active { background: var(--border); }
+.icon-btn svg { width: 16px; height: 16px; }
+
+.label-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.brush-setting {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.brush-setting label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+.brush-setting input[type=range] {
+  width: 72px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.brush-setting .val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 24px;
+  text-align: right;
+}
+
+.spacer { flex: 1; }
+
+.btn {
+  height: 30px; padding: 0 12px;
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  color: var(--text);
+  transition: background 0.12s, border-color 0.12s;
+  display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--bg); border-color: #bbb; }
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.btn.primary:hover { background: var(--accent-hover); }
+.btn svg { width: 13px; height: 13px; }
+
+/* ── Main Layout ── */
+.main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── Left Toolbar ── */
+.toolbar {
+  width: var(--toolbar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  gap: 2px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.tool-btn {
+  width: 36px; height: 36px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #888;
+  transition: background 0.1s, color 0.1s;
+  position: relative;
+}
+.tool-btn:hover { background: var(--bg); color: var(--text); }
+.tool-btn.active {
+  background: #ede9fe;
+  color: var(--accent);
+}
+.tool-btn svg { width: 18px; height: 18px; }
+
+.tool-sep { width: 24px; height: 1px; background: var(--border); margin: 4px 0; }
+
+.tool-tooltip {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%; transform: translateY(-50%);
+  background: #1a1a1a;
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 100;
+}
+.tool-btn:hover .tool-tooltip { opacity: 1; }
+
+/* ── Viewport ── */
+.viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #87ceeb 0%, #b0e2ff 40%, #5a9e42 40%, #4a8a35 100%);
+}
+#canvas3d {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  cursor: crosshair;
+}
+#canvas3d.tool-hand { cursor: grab; }
+#canvas3d.tool-hand:active { cursor: grabbing; }
+#canvas3d.tool-eyedrop { cursor: crosshair; }
+
+.viewport-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.4);
+  color: white;
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 1s;
+}
+.viewport-hint.fade { opacity: 0; }
+
+/* ── Right Panel ── */
+.right-panel {
+  width: var(--panel-w);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.panel-section {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-section:last-child { border-bottom: none; }
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* Color Wheel */
+.color-wheel-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  margin-bottom: 10px;
+}
+#colorWheel { width: 100%; height: 100%; cursor: crosshair; border-radius: 50%; display: block; }
+#svCanvas {
+  position: absolute;
+  inset: 12%;
+  width: 76%; height: 76%;
+  cursor: crosshair;
+  border-radius: 4px;
+}
+
+.color-sliders { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.slider-row { display: flex; align-items: center; gap: 8px; }
+.slider-row label { font-size: 11px; color: var(--text2); width: 14px; flex-shrink: 0; font-weight: 600; }
+.slider-row input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+.slider-row .sv { font-size: 11px; font-weight: 600; min-width: 28px; text-align: right; color: var(--text); }
+
+.hex-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+}
+.color-preview {
+  width: 32px; height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border2);
+  flex-shrink: 0;
+}
+.hex-input {
+  flex: 1;
+  height: 32px;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.hex-input:focus { border-color: var(--accent); }
+
+/* Swatches */
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+.swatch {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.swatch:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.5); }
+.swatch.active { border-color: var(--accent); transform: scale(1.1); }
+
+/* Skin Preview (2D) */
+.skin-2d-wrap {
+  position: relative;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#skin2d {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  width: 100%;
+  max-width: 252px;
+}
+
+/* Opacity */
+.opacity-slider {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Recent colors */
+.recent-colors {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.recent-dot {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.1s;
+}
+.recent-dot:hover { transform: scale(1.2); border-color: rgba(0,0,0,0.2); }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #1a1a1a;
+  color: white;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 999;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* Checkerboard for transparency */
+.checker {
+  background-image:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+}
+
+input[type=file] { display: none; }
+
+/* Layer indicator on topbar */
+.undo-count {
+  font-size: 10px;
+  color: var(--text2);
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">⛏</div>
+    <span>Skin<span class="brand">3D</span></span>
+  </div>
+  <div class="divider-v"></div>
+
+  <button class="icon-btn" id="btnUndo" title="Undo (Ctrl+Z)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg>
+  </button>
+  <button class="icon-btn" id="btnRedo" title="Redo (Ctrl+Y)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 009.5 20H13"/></svg>
+  </button>
+  <span class="undo-count" id="undoCount"></span>
+
+  <div class="divider-v"></div>
+
+  <div class="brush-setting">
+    <label>Size</label>
+    <input type="range" id="brushSize" min="1" max="16" value="1">
+    <span class="val" id="brushSizeVal">1</span>
+    <label style="margin-left:2px">px</label>
+  </div>
+
+  <div class="brush-setting">
+    <label>Opacity</label>
+    <input type="range" id="brushOpacity" min="1" max="100" value="100">
+    <span class="val" id="brushOpacityVal">100</span>
+    <label>%</label>
+  </div>
+
+  <div class="spacer"></div>
+
+  <button class="btn" id="btnImport">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Import Skin
+  </button>
+  <input type="file" id="fileInput" accept=".png">
+
+  <button class="btn" id="btnExport">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    Export
+  </button>
+
+  <button class="btn primary" id="btnSave">Save</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT TOOLBAR -->
+  <div class="toolbar">
+    <button class="tool-btn active" data-tool="brush" title="Brush (B)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19c-1.7 0-3-1.3-3-3 0-2 3-8 3-8s3 6 3 8c0 1.7-1.3 3-3 3z"/><path d="M12 8V3"/></svg>
+      <span class="tool-tooltip">Brush (B)</span>
+    </button>
+    <button class="tool-btn" data-tool="erase" title="Eraser (E)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16l10-10 7 7-2.5 2.5"/><path d="M6.0 11.0 l7 7"/></svg>
+      <span class="tool-tooltip">Eraser (E)</span>
+    </button>
+    <button class="tool-btn" data-tool="fill" title="Fill (G)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11L8.9 1 3 6.9l10 10.1"/><path d="M19 11c1.8 1.8 2 4.5.5 6.5s-4.2 2.4-6.2.5c-1.1-1.1-1.6-2.9-1.3-4.5l.5-3"/><circle cx="19.5" cy="19.5" r="2.5" fill="currentColor" stroke="none"/></svg>
+      <span class="tool-tooltip">Fill (G)</span>
+    </button>
+    <button class="tool-btn" data-tool="eyedrop" title="Eyedropper (I)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="M15 6l3.4-3.4a2 2 0 012.8 0l.2.2a2 2 0 010 2.8L18 9l-3-3z"/></svg>
+      <span class="tool-tooltip">Eyedropper (I)</span>
+    </button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" data-tool="hand" title="Rotate/Pan (V)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 00-2-2v0a2 2 0 00-2 2v0"/><path d="M14 10V4a2 2 0 00-2-2v0a2 2 0 00-2 2v2"/><path d="M10 10.5V6a2 2 0 00-2-2v0a2 2 0 00-2 2v8"/><path d="M18 8a2 2 0 114 0v6a8 8 0 01-8 8h-2c-2.8 0-4.5-.86-5.99-2.34L4 19"/></svg>
+      <span class="tool-tooltip">Rotate / Pan (V)</span>
+    </button>
+  </div>
+
+  <!-- VIEWPORT -->
+  <div class="viewport" id="viewport">
+    <canvas id="canvas3d"></canvas>
+    <div class="viewport-hint" id="hint">Hold V or right-click to rotate · Scroll to zoom</div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <!-- Color Wheel -->
+    <div class="panel-section">
+      <div class="section-title">Color</div>
+      <div class="color-wheel-wrap">
+        <canvas id="colorWheel"></canvas>
+        <canvas id="svCanvas"></canvas>
+      </div>
+      <div class="color-sliders">
+        <div class="slider-row">
+          <label>H</label>
+          <input type="range" id="slH" min="0" max="360" value="0">
+          <span class="sv" id="valH">0°</span>
+        </div>
+        <div class="slider-row">
+          <label>S</label>
+          <input type="range" id="slS" min="0" max="100" value="100">
+          <span class="sv" id="valS">100</span>
+        </div>
+        <div class="slider-row">
+          <label>V</label>
+          <input type="range" id="slV" min="0" max="100" value="50">
+          <span class="sv" id="valV">50</span>
+        </div>
+      </div>
+      <div class="hex-row">
+        <div class="color-preview checker" id="colorPreviewBg">
+          <div class="color-preview" id="colorPreview" style="border:none;width:100%;height:100%;"></div>
+        </div>
+        <input class="hex-input" id="hexInput" type="text" value="#ff0000" spellcheck="false">
+      </div>
+    </div>
+
+    <!-- Swatches -->
+    <div class="panel-section">
+      <div class="section-title">Palette</div>
+      <div class="swatches" id="swatches"></div>
+    </div>
+
+    <!-- Recent -->
+    <div class="panel-section">
+      <div class="section-title">Recent</div>
+      <div class="recent-colors" id="recentColors"></div>
+    </div>
+
+    <!-- 2D Skin View -->
+    <div class="panel-section">
+      <div class="section-title">Skin Texture</div>
+      <div class="skin-2d-wrap checker">
+        <canvas id="skin2d" width="64" height="64"></canvas>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ── State ──────────────────────────────────────────────
+let currentTool = 'brush';
+let currentH = 0, currentS = 100, currentV = 50;
+let currentOpacity = 1;
+let brushSize = 1;
+let isPainting = false;
+let lastPaintedUV = null;
+let undoStack = [];
+let redoStack = [];
+const MAX_UNDO = 50;
+
+// ── Skin Canvas (64×64) ────────────────────────────────
+const skinCanvas = document.createElement('canvas');
+skinCanvas.width = skinCanvas.height = 64;
+const skinCtx = skinCanvas.getContext('2d');
+
+// Fill with default Steve base colors
+function initDefaultSkin() {
+  skinCtx.clearRect(0, 0, 64, 64);
+
+  // Head front (8,8 → 16,16): face/skin tone
+  const skin = '#C68642', hair = '#3D2B1A', dark = '#2A1A0A';
+  const shirt = '#1DBFBC', pants = '#7148C9', shoe = '#4A3728';
+  const eye = '#2D4DA0', white_ = '#E8E8E8';
+
+  // --- HEAD ---
+  // Top (8,0,16,8): hair
+  skinCtx.fillStyle = hair; skinCtx.fillRect(8,0,8,8);
+  // Bottom (16,0,24,8): skin
+  skinCtx.fillStyle = skin; skinCtx.fillRect(16,0,8,8);
+  // Right face (0,8,8,16): skin
+  skinCtx.fillStyle = skin; skinCtx.fillRect(0,8,8,8);
+  // Front (8,8,16,16): face
+  skinCtx.fillStyle = skin; skinCtx.fillRect(8,8,8,8);
+  // eyes
+  skinCtx.fillStyle = eye; skinCtx.fillRect(9,10,2,2); skinCtx.fillRect(13,10,2,2);
+  skinCtx.fillStyle = '#111'; skinCtx.fillRect(10,10,1,2); skinCtx.fillRect(14,10,1,2);
+  // mouth
+  skinCtx.fillStyle = dark; skinCtx.fillRect(10,13,4,1);
+  skinCtx.fillStyle = '#E8C090'; skinCtx.fillRect(11,13,1,1); skinCtx.fillRect(12,13,1,1);
+  // beard stub
+  skinCtx.fillStyle = '#8B6542'; skinCtx.fillRect(9,13,1,1); skinCtx.fillRect(14,13,1,1);
+  // Left face (16,8,24,16): skin
+  skinCtx.fillStyle = skin; skinCtx.fillRect(16,8,8,8);
+  // Back (24,8,32,16): hair
+  skinCtx.fillStyle = hair; skinCtx.fillRect(24,8,8,8);
+  // hair detail on back
+  skinCtx.fillStyle = dark; skinCtx.fillRect(25,9,6,1); skinCtx.fillRect(26,14,4,1);
+
+  // --- BODY ---
+  // Top (20,16,28,20): shirt
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(20,16,8,4);
+  // Bottom (28,16,36,20): shirt
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(28,16,8,4);
+  // Right side (16,20,20,32)
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(16,20,4,12);
+  // Front (20,20,28,32)
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(20,20,8,12);
+  // darker stripe
+  skinCtx.fillStyle = '#18A8A5'; skinCtx.fillRect(23,20,2,12);
+  // Left side (28,20,32,32)
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(28,20,4,12);
+  // Back (32,20,40,32)
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(32,20,8,12);
+
+  // --- RIGHT ARM (40,16,56,32 region) ---
+  // Top (44,16,48,20)
+  skinCtx.fillStyle = skin; skinCtx.fillRect(44,16,4,4);
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(44,16,4,2);
+  // Bottom (48,16,52,20)
+  skinCtx.fillStyle = skin; skinCtx.fillRect(48,16,4,4);
+  // Right (40,20,44,32)
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(40,20,4,4);
+  skinCtx.fillStyle = skin; skinCtx.fillRect(40,24,4,8);
+  // Front (44,20,48,32)
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(44,20,4,4);
+  skinCtx.fillStyle = skin; skinCtx.fillRect(44,24,4,8);
+  // Left (48,20,52,32)
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(48,20,4,4);
+  skinCtx.fillStyle = skin; skinCtx.fillRect(48,24,4,8);
+  // Back (52,20,56,32)
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(52,20,4,4);
+  skinCtx.fillStyle = skin; skinCtx.fillRect(52,24,4,8);
+
+  // --- LEFT ARM (32,48,48,64 region) ---
+  skinCtx.fillStyle = skin; skinCtx.fillRect(36,48,4,4);
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(36,48,4,2);
+  skinCtx.fillStyle = skin; skinCtx.fillRect(40,48,4,4);
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(32,52,4,4);
+  skinCtx.fillStyle = skin; skinCtx.fillRect(32,56,4,8);
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(36,52,4,4);
+  skinCtx.fillStyle = skin; skinCtx.fillRect(36,56,4,8);
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(40,52,4,4);
+  skinCtx.fillStyle = skin; skinCtx.fillRect(40,56,4,8);
+  skinCtx.fillStyle = shirt; skinCtx.fillRect(44,52,4,4);
+  skinCtx.fillStyle = skin; skinCtx.fillRect(44,56,4,8);
+
+  // --- RIGHT LEG (0,16,16,32) ---
+  skinCtx.fillStyle = pants; skinCtx.fillRect(0,20,4,4);
+  skinCtx.fillStyle = pants; skinCtx.fillRect(4,16,4,4);
+  skinCtx.fillStyle = pants; skinCtx.fillRect(8,16,4,4);
+  skinCtx.fillStyle = pants; skinCtx.fillRect(4,20,4,4);
+  skinCtx.fillStyle = pants; skinCtx.fillRect(8,20,4,4);
+  skinCtx.fillStyle = pants; skinCtx.fillRect(12,20,4,4);
+  for (const rx of [0,4,8,12]) {
+    skinCtx.fillStyle = pants; skinCtx.fillRect(rx,20,4,7);
+    skinCtx.fillStyle = shoe; skinCtx.fillRect(rx,27,4,5);
+  }
+
+  // --- LEFT LEG (16,48,32,64) ---
+  for (const rx of [16,20,24,28]) {
+    skinCtx.fillStyle = pants; skinCtx.fillRect(rx,52,4,7);
+    skinCtx.fillStyle = shoe; skinCtx.fillRect(rx,59,4,5);
+  }
+  skinCtx.fillStyle = pants; skinCtx.fillRect(20,48,4,4);
+  skinCtx.fillStyle = pants; skinCtx.fillRect(24,48,4,4);
+}
+
+initDefaultSkin();
+saveUndoState();
+
+// ── Three.js Setup ─────────────────────────────────────
+const viewport = document.getElementById('viewport');
+const canvas3d = document.getElementById('canvas3d');
+
+const scene = new THREE.Scene();
+scene.background = null; // transparent, CSS handles bg
+
+const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = false;
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
+camera.position.set(0, 4, 55);
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+const sun = new THREE.DirectionalLight(0xffffff, 0.7);
+sun.position.set(4, 8, 6);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x88aaff, 0.3);
+fill.position.set(-4, 2, -4);
+scene.add(fill);
+
+// Texture
+const skinTexture = new THREE.CanvasTexture(skinCanvas);
+skinTexture.magFilter = THREE.NearestFilter;
+skinTexture.minFilter = THREE.NearestFilter;
+skinTexture.colorSpace = THREE.SRGBColorSpace;
+
+const skinMat = new THREE.MeshLambertMaterial({ map: skinTexture });
+
+// UV setter — converts pixel coords to Three.js UV
+// Three.js BoxGeometry UV order per face: top-left, top-right, bottom-left, bottom-right
+function setBoxUVs(geo, faceUVs) {
+  const S = 64;
+  const arr = geo.attributes.uv.array;
+  faceUVs.forEach(([px1, py1, px2, py2, flipU], i) => {
+    const base = i * 8;
+    let ul = px1/S, ur = px2/S;
+    if (flipU) { [ul, ur] = [ur, ul]; }
+    const vt = 1 - py1/S;
+    const vb = 1 - py2/S;
+    // top-left, top-right, bottom-left, bottom-right
+    arr[base+0]=ul; arr[base+1]=vt;
+    arr[base+2]=ur; arr[base+3]=vt;
+    arr[base+4]=ul; arr[base+5]=vb;
+    arr[base+6]=ur; arr[base+7]=vb;
+  });
+  geo.attributes.uv.needsUpdate = true;
+}
+
+// [+x, -x, +y, -y, +z, -z] → [px1,py1,px2,py2, flipU?]
+function makePart(w, h, d, px, py, pz, uvFaces) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  setBoxUVs(geo, uvFaces);
+  const mesh = new THREE.Mesh(geo, skinMat);
+  mesh.position.set(px, py, pz);
+  scene.add(mesh);
+  meshes.push(mesh);
+  return mesh;
+}
+
+const meshes = [];
+
+// HEAD
+makePart(8,8,8, 0,10,0, [
+  [16,8,24,16],       // +x left face of head
+  [0,8,8,16],         // -x right face
+  [8,0,16,8],         // +y top
+  [16,0,24,8],        // -y bottom
+  [8,8,16,16],        // +z front
+  [24,8,32,16,true],  // -z back (flipped)
+]);
+
+// BODY
+makePart(8,12,4, 0,0,0, [
+  [28,20,32,32],
+  [16,20,20,32],
+  [20,16,28,20],
+  [28,16,36,20],
+  [20,20,28,32],
+  [32,20,40,32,true],
+]);
+
+// RIGHT ARM (player right = −X)
+makePart(4,12,4, -6,0,0, [
+  [48,20,52,32],
+  [40,20,44,32],
+  [44,16,48,20],
+  [48,16,52,20],
+  [44,20,48,32],
+  [52,20,56,32,true],
+]);
+
+// LEFT ARM (player left = +X)
+makePart(4,12,4, 6,0,0, [
+  [40,52,44,64],
+  [32,52,36,64],
+  [36,48,40,52],
+  [40,48,44,52],
+  [36,52,40,64],
+  [44,52,48,64,true],
+]);
+
+// RIGHT LEG
+makePart(4,12,4, -2,-12,0, [
+  [8,20,12,32],
+  [0,20,4,32],
+  [4,16,8,20],
+  [8,16,12,20],
+  [4,20,8,32],
+  [12,20,16,32,true],
+]);
+
+// LEFT LEG
+makePart(4,12,4, 2,-12,0, [
+  [24,52,28,64],
+  [16,52,20,64],
+  [20,48,24,52],
+  [24,48,28,52],
+  [20,52,24,64],
+  [28,52,32,64,true],
+]);
+
+// ── OrbitControls ──────────────────────────────────────
+const controls = new OrbitControls(camera, canvas3d);
+controls.target.set(0, 0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.1;
+controls.enablePan = true;
+controls.mouseButtons = {
+  LEFT: null, // managed manually
+  MIDDLE: THREE.MOUSE.DOLLY,
+  RIGHT: THREE.MOUSE.ROTATE
+};
+controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_PAN };
+
+// ── Raycaster ─────────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function getIntersect(e) {
+  const rect = canvas3d.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(meshes);
+  return hits.length > 0 ? hits[0] : null;
+}
+
+// ── Paint Logic ────────────────────────────────────────
+function hsvToRgb(h, s, v) {
+  s /= 100; v /= 100;
+  const i = Math.floor(h / 60) % 6;
+  const f = h / 60 - Math.floor(h / 60);
+  const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+  const [r, g, b] = [[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i];
+  return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+}
+
+function getCurrentColor() {
+  const [r,g,b] = hsvToRgb(currentH, currentS, currentV);
+  return { r, g, b, a: currentOpacity };
+}
+
+function paintPixel(px, py, color, size) {
+  const r = Math.max(0, Math.floor((size - 1) / 2));
+  const { r: cr, g: cg, b: cb, a: ca } = color;
+
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (r > 0 && dx*dx + dy*dy > r*r) continue;
+      const x = px + dx, y = py + dy;
+      if (x < 0 || x >= 64 || y < 0 || y >= 64) continue;
+
+      if (currentTool === 'erase') {
+        skinCtx.clearRect(x, y, 1, 1);
+      } else {
+        skinCtx.globalAlpha = ca;
+        skinCtx.fillStyle = `rgb(${cr},${cg},${cb})`;
+        skinCtx.fillRect(x, y, 1, 1);
+        skinCtx.globalAlpha = 1;
+      }
+    }
+  }
+  skinTexture.needsUpdate = true;
+  update2D();
+}
+
+function floodFill(startX, startY, fillR, fillG, fillB, fillA) {
+  const imgData = skinCtx.getImageData(0, 0, 64, 64);
+  const data = imgData.data;
+  const idx = (startY * 64 + startX) * 4;
+  const tr = data[idx], tg = data[idx+1], tb = data[idx+2], ta = data[idx+3];
+
+  const nr = fillR, ng = fillG, nb = fillB, na = Math.round(fillA * 255);
+  if (tr===nr && tg===ng && tb===nb && ta===na) return;
+
+  const stack = [[startX, startY]];
+  const visited = new Uint8Array(64 * 64);
+
+  while (stack.length) {
+    const [x, y] = stack.pop();
+    if (x < 0 || x >= 64 || y < 0 || y >= 64) continue;
+    const i = y * 64 + x;
+    if (visited[i]) continue;
+    visited[i] = 1;
+    const d = i * 4;
+    if (data[d]!==tr || data[d+1]!==tg || data[d+2]!==tb || data[d+3]!==ta) continue;
+    data[d]=nr; data[d+1]=ng; data[d+2]=nb; data[d+3]=na;
+    stack.push([x-1,y],[x+1,y],[x,y-1],[x,y+1]);
+  }
+  skinCtx.putImageData(imgData, 0, 0);
+  skinTexture.needsUpdate = true;
+  update2D();
+}
+
+function paintAtUV(uv, addToRecent=false) {
+  const px = Math.floor(uv.x * 64);
+  const py = Math.floor((1 - uv.y) * 64);
+  const color = getCurrentColor();
+
+  if (currentTool === 'fill') {
+    const [r,g,b] = hsvToRgb(currentH, currentS, currentV);
+    floodFill(px, py, r, g, b, currentOpacity);
+    if (addToRecent) addRecentColor();
+    return;
+  }
+
+  paintPixel(px, py, color, brushSize);
+  if (addToRecent) addRecentColor();
+}
+
+function eyedropAt(uv) {
+  const px = Math.floor(uv.x * 64);
+  const py = Math.floor((1 - uv.y) * 64);
+  const d = skinCtx.getImageData(px, py, 1, 1).data;
+  if (d[3] === 0) return;
+  setColorFromRGB(d[0], d[1], d[2]);
+}
+
+// ── Undo / Redo ────────────────────────────────────────
+function saveUndoState() {
+  const data = skinCtx.getImageData(0, 0, 64, 64);
+  undoStack.push(data);
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = [];
+  updateUndoUI();
+}
+
+function undo() {
+  if (undoStack.length < 2) return;
+  redoStack.push(undoStack.pop());
+  skinCtx.putImageData(undoStack[undoStack.length - 1], 0, 0);
+  skinTexture.needsUpdate = true;
+  update2D();
+  updateUndoUI();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  const state = redoStack.pop();
+  undoStack.push(state);
+  skinCtx.putImageData(state, 0, 0);
+  skinTexture.needsUpdate = true;
+  update2D();
+  updateUndoUI();
+}
+
+function updateUndoUI() {
+  document.getElementById('undoCount').textContent =
+    undoStack.length > 1 ? `${undoStack.length - 1}` : '';
+}
+
+// ── Mouse Events ───────────────────────────────────────
+let orbitEnabled = false;
+
+canvas3d.addEventListener('mousedown', e => {
+  if (e.button === 2 || currentTool === 'hand') {
+    controls.enabled = true;
+    orbitEnabled = true;
+    controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+    return;
+  }
+  if (e.button !== 0) return;
+
+  const hit = getIntersect(e);
+  if (!hit) return;
+
+  if (currentTool === 'eyedrop') {
+    eyedropAt(hit.uv);
+    return;
+  }
+
+  isPainting = true;
+  lastPaintedUV = null;
+  saveUndoState();
+  paintAtUV(hit.uv, true);
+  lastPaintedUV = hit.uv.clone();
+});
+
+canvas3d.addEventListener('mousemove', e => {
+  if (!isPainting) return;
+  if (currentTool === 'eyedrop' || currentTool === 'hand') return;
+
+  const hit = getIntersect(e);
+  if (!hit) return;
+  paintAtUV(hit.uv, false);
+  lastPaintedUV = hit.uv.clone();
+});
+
+window.addEventListener('mouseup', e => {
+  if (isPainting) isPainting = false;
+  if (orbitEnabled && currentTool !== 'hand') {
+    controls.enabled = false;
+    orbitEnabled = false;
+    controls.mouseButtons.LEFT = null;
+  }
+});
+
+// Keyboard shortcuts
+window.addEventListener('keydown', e => {
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT') return;
+
+  switch(e.key.toLowerCase()) {
+    case 'b': setTool('brush'); break;
+    case 'e': setTool('erase'); break;
+    case 'g': setTool('fill'); break;
+    case 'i': setTool('eyedrop'); break;
+    case 'v': setTool('hand'); break;
+    case 'z': if (e.ctrlKey||e.metaKey) { e.shiftKey ? redo() : undo(); } break;
+    case 'y': if (e.ctrlKey||e.metaKey) redo(); break;
+    case '[': brushSize = Math.max(1, brushSize-1); updateBrushUI(); break;
+    case ']': brushSize = Math.min(16, brushSize+1); updateBrushUI(); break;
+  }
+});
+
+// Hold V to rotate
+window.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === ' ' && !e.repeat) {
+    controls.enabled = true;
+    canvas3d.style.cursor = 'grab';
+  }
+});
+window.addEventListener('keyup', e => {
+  if (e.key.toLowerCase() === ' ') {
+    if (currentTool !== 'hand') {
+      controls.enabled = false;
+      canvas3d.style.cursor = currentTool === 'hand' ? 'grab' : 'crosshair';
+    }
+  }
+});
+
+// Right-click = always rotate
+canvas3d.addEventListener('contextmenu', e => e.preventDefault());
+
+// ── Tool Buttons ───────────────────────────────────────
+function setTool(tool) {
+  currentTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tool === tool);
+  });
+  if (tool === 'hand') {
+    controls.enabled = true;
+    controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+    canvas3d.className = 'tool-hand';
+  } else {
+    controls.enabled = false;
+    controls.mouseButtons.LEFT = null;
+    canvas3d.className = tool === 'eyedrop' ? 'tool-eyedrop' : '';
+  }
+}
+
+document.querySelectorAll('.tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => setTool(btn.dataset.tool));
+});
+
+// Initial state: orbit OFF for painting
+controls.enabled = false;
+
+// ── Brush Size ─────────────────────────────────────────
+const brushSizeSlider = document.getElementById('brushSize');
+const brushSizeVal = document.getElementById('brushSizeVal');
+brushSizeSlider.addEventListener('input', () => {
+  brushSize = parseInt(brushSizeSlider.value);
+  brushSizeVal.textContent = brushSize;
+});
+
+function updateBrushUI() {
+  brushSizeSlider.value = brushSize;
+  brushSizeVal.textContent = brushSize;
+}
+
+const brushOpSlider = document.getElementById('brushOpacity');
+const brushOpVal = document.getElementById('brushOpacityVal');
+brushOpSlider.addEventListener('input', () => {
+  currentOpacity = parseInt(brushOpSlider.value) / 100;
+  brushOpVal.textContent = brushOpSlider.value;
+});
+
+// ── 2D Preview ─────────────────────────────────────────
+const skin2d = document.getElementById('skin2d');
+const ctx2d = skin2d.getContext('2d');
+
+function update2D() {
+  ctx2d.clearRect(0, 0, 64, 64);
+  ctx2d.drawImage(skinCanvas, 0, 0);
+}
+update2D();
+
+// ── Color System ───────────────────────────────────────
+const colorPreview = document.getElementById('colorPreview');
+const hexInput = document.getElementById('hexInput');
+const slH = document.getElementById('slH');
+const slS = document.getElementById('slS');
+const slV = document.getElementById('slV');
+const valH = document.getElementById('valH');
+const valS = document.getElementById('valS');
+const valV = document.getElementById('valV');
+
+function rgbToHsv(r, g, b) {
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+  let h=0, s=max===0?0:d/max, v=max;
+  if (d!==0) {
+    switch(max) {
+      case r: h=((g-b)/d)%6; break;
+      case g: h=(b-r)/d+2; break;
+      case b: h=(r-g)/d+4; break;
+    }
+    h = Math.round(h*60); if(h<0)h+=360;
+  }
+  return [h, Math.round(s*100), Math.round(v*100)];
+}
+
+function hexToRgb(hex) {
+  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.replace('#','').replace(/^(\w)(\w)(\w)$/,'$1$1$2$2$3$3'));
+  return r ? [parseInt(r[1],16), parseInt(r[2],16), parseInt(r[3],16)] : null;
+}
+
+function setColorFromRGB(r, g, b) {
+  const [h,s,v] = rgbToHsv(r,g,b);
+  currentH=h; currentS=s; currentV=v;
+  updateColorUI();
+}
+
+function updateColorUI() {
+  const [r,g,b] = hsvToRgb(currentH, currentS, currentV);
+  const hex = '#' + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  colorPreview.style.background = hex;
+  hexInput.value = hex;
+  slH.value = currentH; valH.textContent = currentH + '°';
+  slS.value = currentS; valS.textContent = currentS;
+  slV.value = currentV; valV.textContent = currentV;
+  drawSVCanvas();
+}
+
+slH.addEventListener('input', () => { currentH=+slH.value; updateColorUI(); });
+slS.addEventListener('input', () => { currentS=+slS.value; updateColorUI(); });
+slV.addEventListener('input', () => { currentV=+slV.value; updateColorUI(); });
+
+hexInput.addEventListener('change', () => {
+  const rgb = hexToRgb(hexInput.value);
+  if (rgb) setColorFromRGB(...rgb);
+});
+
+// ── Color Wheel ────────────────────────────────────────
+const wheelCanvas = document.getElementById('colorWheel');
+const wctx = wheelCanvas.getContext('2d');
+
+function drawWheel() {
+  const size = wheelCanvas.width;
+  const cx = size/2, cy = size/2, r = size/2;
+  const img = wctx.createImageData(size, size);
+  for (let y=0; y<size; y++) {
+    for (let x=0; x<size; x++) {
+      const dx = x-cx, dy = y-cy;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      if (dist > r) continue;
+      const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+      const sat = dist/r * 100;
+      const [rr,gg,bb] = hsvToRgb(angle, sat, 100);
+      const i = (y*size+x)*4;
+      img.data[i]=rr; img.data[i+1]=gg; img.data[i+2]=bb; img.data[i+3]=255;
+    }
+  }
+  wctx.putImageData(img, 0, 0);
+
+  // draw hue indicator
+  const angle = (currentH * Math.PI / 180);
+  const sat = currentS / 100;
+  const ix = cx + Math.cos(angle) * sat * r;
+  const iy = cy + Math.sin(angle) * sat * r;
+  wctx.beginPath();
+  wctx.arc(ix, iy, 5, 0, Math.PI*2);
+  wctx.strokeStyle = 'white';
+  wctx.lineWidth = 2;
+  wctx.stroke();
+  wctx.beginPath();
+  wctx.arc(ix, iy, 5, 0, Math.PI*2);
+  wctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  wctx.lineWidth = 1;
+  wctx.stroke();
+}
+
+// SV Canvas (brightness/saturation square in center)
+const svCanvas = document.getElementById('svCanvas');
+const svCtx = svCanvas.getContext('2d');
+
+function drawSVCanvas() {
+  const w = svCanvas.width, h = svCanvas.height;
+  const [r,g,b] = hsvToRgb(currentH, 100, 100);
+
+  const gH = svCtx.createLinearGradient(0, 0, w, 0);
+  gH.addColorStop(0, 'white');
+  gH.addColorStop(1, `rgb(${r},${g},${b})`);
+  svCtx.fillStyle = gH;
+  svCtx.fillRect(0, 0, w, h);
+
+  const gV = svCtx.createLinearGradient(0, 0, 0, h);
+  gV.addColorStop(0, 'transparent');
+  gV.addColorStop(1, 'black');
+  svCtx.fillStyle = gV;
+  svCtx.fillRect(0, 0, w, h);
+
+  // indicator
+  const x = (currentS / 100) * w;
+  const y = (1 - currentV / 100) * h;
+  svCtx.beginPath();
+  svCtx.arc(x, y, 5, 0, Math.PI*2);
+  svCtx.strokeStyle = 'white';
+  svCtx.lineWidth = 2;
+  svCtx.stroke();
+  svCtx.beginPath();
+  svCtx.arc(x, y, 5, 0, Math.PI*2);
+  svCtx.strokeStyle = 'rgba(0,0,0,0.4)';
+  svCtx.lineWidth = 1;
+  svCtx.stroke();
+
+  drawWheel();
+}
+
+function resizeWheelCanvas() {
+  const size = wheelCanvas.parentElement.clientWidth;
+  wheelCanvas.width = wheelCanvas.height = size;
+  const inner = Math.round(size * 0.76);
+  svCanvas.width = svCanvas.height = inner;
+  drawSVCanvas();
+}
+
+// Wheel interaction
+function wheelPickColor(e) {
+  const rect = wheelCanvas.getBoundingClientRect();
+  const cx = wheelCanvas.width/2, cy = wheelCanvas.height/2;
+  const dx = (e.clientX - rect.left) * (wheelCanvas.width/rect.width) - cx;
+  const dy = (e.clientY - rect.top) * (wheelCanvas.height/rect.height) - cy;
+  const r = wheelCanvas.width/2;
+  const dist = Math.sqrt(dx*dx+dy*dy);
+  if (dist > r) return;
+  currentH = Math.round((Math.atan2(dy, dx) * 180/Math.PI + 360) % 360);
+  currentS = Math.round(Math.min(dist/r, 1) * 100);
+  updateColorUI();
+}
+
+let draggingWheel = false;
+wheelCanvas.addEventListener('mousedown', e => { draggingWheel = true; wheelPickColor(e); });
+window.addEventListener('mousemove', e => { if (draggingWheel) wheelPickColor(e); });
+window.addEventListener('mouseup', () => draggingWheel = false);
+
+// SV interaction
+function svPickColor(e) {
+  const rect = svCanvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  currentS = Math.round(Math.max(0, Math.min(1, x)) * 100);
+  currentV = Math.round(Math.max(0, Math.min(1, 1-y)) * 100);
+  updateColorUI();
+}
+
+let draggingSV = false;
+svCanvas.addEventListener('mousedown', e => { e.stopPropagation(); draggingSV = true; svPickColor(e); });
+window.addEventListener('mousemove', e => { if (draggingSV) svPickColor(e); });
+window.addEventListener('mouseup', () => draggingSV = false);
+
+// ── Swatches ───────────────────────────────────────────
+const swatchColors = [
+  '#000000','#3d3d3d','#7f7f7f','#c0c0c0','#ffffff',
+  '#ff0000','#ff7f00','#ffff00','#7fff00',
+  '#00ff00','#00ff7f','#00ffff','#007fff',
+  '#0000ff','#7f00ff','#ff00ff','#ff007f',
+  '#8B0000','#a0522d','#c68642','#f4a460',
+  '#1a3a5c','#4169e1','#87ceeb','#e0f7fa',
+  '#2d5a27','#228b22','#90ee90','#f5f5dc',
+  '#4b0082','#9400d3','#da70d6','#ffd700',
+];
+
+const swatchesEl = document.getElementById('swatches');
+swatchColors.forEach(c => {
+  const el = document.createElement('div');
+  el.className = 'swatch';
+  el.style.background = c;
+  el.addEventListener('click', () => {
+    const rgb = hexToRgb(c);
+    if (rgb) setColorFromRGB(...rgb);
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+  });
+  swatchesEl.appendChild(el);
+});
+
+// ── Recent Colors ──────────────────────────────────────
+const recentEl = document.getElementById('recentColors');
+const recentList = [];
+
+function addRecentColor() {
+  const [r,g,b] = hsvToRgb(currentH, currentS, currentV);
+  const hex = '#' + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  if (recentList[0] === hex) return;
+  recentList.unshift(hex);
+  if (recentList.length > 16) recentList.pop();
+  renderRecent();
+}
+
+function renderRecent() {
+  recentEl.innerHTML = '';
+  recentList.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'recent-dot';
+    el.style.background = c;
+    el.addEventListener('click', () => {
+      const rgb = hexToRgb(c);
+      if (rgb) setColorFromRGB(...rgb);
+    });
+    recentEl.appendChild(el);
+  });
+}
+
+// ── Import / Export ────────────────────────────────────
+document.getElementById('btnImport').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    skinCtx.clearRect(0, 0, 64, 64);
+    skinCtx.drawImage(img, 0, 0, 64, 64);
+    skinTexture.needsUpdate = true;
+    update2D();
+    saveUndoState();
+    showToast('Skin imported!');
+  };
+  img.src = URL.createObjectURL(file);
+  e.target.value = '';
+});
+
+document.getElementById('btnExport').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = 'skin.png';
+  a.href = skinCanvas.toDataURL('image/png');
+  a.click();
+  showToast('Skin exported as skin.png');
+});
+
+document.getElementById('btnSave').addEventListener('click', () => {
+  // same as export but show a saved message
+  const a = document.createElement('a');
+  a.download = 'skin.png';
+  a.href = skinCanvas.toDataURL('image/png');
+  a.click();
+  showToast('Saved to skin.png');
+});
+
+// Undo/Redo buttons
+document.getElementById('btnUndo').addEventListener('click', undo);
+document.getElementById('btnRedo').addEventListener('click', redo);
+
+// ── Toast ──────────────────────────────────────────────
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Hint fade ─────────────────────────────────────────
+setTimeout(() => {
+  document.getElementById('hint').classList.add('fade');
+}, 4000);
+
+// ── Resize ────────────────────────────────────────────
+function onResize() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  resizeWheelCanvas();
+}
+window.addEventListener('resize', onResize);
+// Defer initial size to after layout
+setTimeout(onResize, 50);
+
+// ── Animation Loop ─────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// Initialize color
+setColorFromRGB(198, 134, 66); // Steve skin tone as default
+resizeWheelCanvas();
+
+</script>
+</body>
+</html>
