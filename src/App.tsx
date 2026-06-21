@@ -17,6 +17,8 @@ import RecipePage from './pages/RecipePage'
 import SuperFlatPage from './pages/SuperFlatPage'
 import AchievementPage from './pages/AchievementPage'
 import MinecraftTextPage from './pages/MinecraftTextPage'
+import SeedConverterPage from './pages/SeedConverterPage'
+import ResourcePackPage from './pages/ResourcePackPage'
 
 export default function App() {
   return (
@@ -40,6 +42,8 @@ export default function App() {
             <Route path="superflat" element={<SuperFlatPage />} />
             <Route path="achievement" element={<AchievementPage />} />
             <Route path="mc-text" element={<MinecraftTextPage />} />
+            <Route path="seed-converter" element={<SeedConverterPage />} />
+            <Route path="resource-pack" element={<ResourcePackPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

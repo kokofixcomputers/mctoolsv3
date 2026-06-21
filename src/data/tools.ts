@@ -149,13 +149,31 @@ export const TOOLS: ToolDef[] = [
     badge: 'New' as const,
   },
   {
+    id: 'seed-converter',
+    path: '/seed-converter',
+    title: 'Seed Converter',
+    desc: 'Convert world seeds between Java and Bedrock editions. Handles negative seed offsets automatically.',
+    category: 'World',
+    tags: ['seed', 'converter', 'bedrock', 'java', 'world', 'edition'],
+    badge: 'New',
+  },
+  {
     id: 'superflat',
     path: '/superflat',
     title: 'Superflat Creator',
     desc: 'Design custom Superflat worlds with any combination of layers. Export as a preset or command.',
     category: 'World',
     tags: ['superflat', 'world', 'preset', 'generator', 'command', 'layers', 'creative'],
-  }
+  },
+  {
+    id: 'resource-pack',
+    path: '/resource-pack',
+    title: 'Resource Pack Maker',
+    desc: 'Browse all vanilla textures by category and replace them with your own PNGs. Export a ready-to-use .zip resource pack.',
+    category: 'Resource Packs',
+    tags: ['resource pack', 'texture', 'pack', 'custom', 'blocks', 'items', 'entity', 'skin', 'zip', 'maker'],
+    badge: 'New',
+  },
 ]
 
 export const CATEGORIES = ['All', ...Array.from(new Set(TOOLS.map((t) => t.category))).sort()]

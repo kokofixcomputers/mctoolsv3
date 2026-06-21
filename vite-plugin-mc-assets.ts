@@ -87,39 +87,37 @@ export function mcAssetsPlugin(): Plugin {
       })
     },
 
-    // Build: copy blocks/ + items/ per version into the output dir
+    // Build: copy texture directories per version into the output dir
     async writeBundle(options) {
       const outDir = options.dir ?? 'dist'
+
+      // Recursively copy a directory (png files only)
+      async function copyDirRecursive(src: string, dst: string): Promise<void> {
+        if (!fs.existsSync(src)) return
+        await fsp.mkdir(dst, { recursive: true })
+        const entries = await fsp.readdir(src, { withFileTypes: true })
+        await Promise.all(entries.map(async entry => {
+          const srcPath = path.join(src, entry.name)
+          const dstPath = path.join(dst, entry.name)
+          if (entry.isDirectory()) {
+            await copyDirRecursive(srcPath, dstPath)
+          } else if (entry.name.endsWith('.png')) {
+            await fsp.copyFile(srcPath, dstPath)
+          }
+        }))
+      }
 
       await Promise.all(APP_VERSIONS.map(async appVer => {
         const srcBase = path.join(DATA_ROOT, resolveVersion(appVer))
         const dstBase = path.join(outDir, 'mc-assets', appVer)
 
-        // Flat directories
-        for (const type of ['blocks', 'items']) {
-          const src = path.join(srcBase, type)
-          const dst = path.join(dstBase, type)
-          await fsp.mkdir(dst, { recursive: true })
-          const files = await fsp.readdir(src)
-          await Promise.all(files.map(f => fsp.copyFile(path.join(src, f), path.join(dst, f))))
-        }
-
-        // GUI sprite subdirectories needed by the achievement generator
-        const guiSpriteDirs = [
-          'gui/sprites/toast',
-          'gui/sprites/advancements',
+        // All texture categories (recursive copy)
+        const categories = [
+          'blocks', 'items', 'entity', 'painting', 'gui',
+          'particle', 'environment', 'misc', 'colormap', 'mob_effect',
         ]
-        for (const rel of guiSpriteDirs) {
-          const src = path.join(srcBase, rel)
-          const dst = path.join(dstBase, rel)
-          if (!fs.existsSync(src)) continue
-          await fsp.mkdir(dst, { recursive: true })
-          const files = await fsp.readdir(src)
-          await Promise.all(
-            files
-              .filter(f => f.endsWith('.png'))
-              .map(f => fsp.copyFile(path.join(src, f), path.join(dst, f)))
-          )
+        for (const type of categories) {
+          await copyDirRecursive(path.join(srcBase, type), path.join(dstBase, type))
         }
       }))
 
