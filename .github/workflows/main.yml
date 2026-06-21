@@ -39,6 +39,11 @@ jobs:
         env:
           CI: true
 
+      - name: Fix asset paths in index.html
+        run: |
+          sed -i 's/href="\/assets\//href="assets\//g' dist/index.html
+          sed -i 's/src="\/assets\//src="assets\//g' dist/index.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
