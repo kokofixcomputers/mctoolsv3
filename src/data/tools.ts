@@ -77,6 +77,15 @@ export const TOOLS: ToolDef[] = [
     tags: ['ore', 'seed', 'diamond', 'finder', 'world', 'bedrock', 'java'],
   },
   {
+    id: 'pixel-art',
+    path: '/pixel-art',
+    title: 'Pixel Art Generator',
+    desc: 'Convert any image into Minecraft pixel art. Matches colors to blocks, shows per-row block counts, and exports a WorldEdit schematic.',
+    category: 'World',
+    tags: ['pixel art', 'image', 'schematic', 'worldedit', 'blocks', 'build', 'convert', 'dither'],
+    badge: 'New',
+  },
+  {
     id: 'circle',
     path: '/circle',
     title: 'Circle Generator',

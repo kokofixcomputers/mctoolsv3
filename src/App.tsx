@@ -22,6 +22,7 @@ import ResourcePackPage from './pages/ResourcePackPage'
 import PlayerLookupPage from './pages/PlayerLookupPage'
 import ResourcePackMergerPage from './pages/ResourcePackMergerPage'
 import SlimeChunkPage from './pages/SlimeChunkPage'
+import PixelArtPage from './pages/PixelArtPage'
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="player" element={<PlayerLookupPage />} />
             <Route path="resource-pack-merger" element={<ResourcePackMergerPage />} />
             <Route path="slime-chunks" element={<SlimeChunkPage />} />
+            <Route path="pixel-art" element={<PixelArtPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
