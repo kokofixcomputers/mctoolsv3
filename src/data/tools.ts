@@ -202,6 +202,15 @@ export const TOOLS: ToolDef[] = [
     badge: 'New',
   },
   {
+    id: 'datapack',
+    path: '/datapack',
+    title: 'Datapack Creator',
+    desc: 'No-code datapack builder — dialogs (1.21.6+), advancements, recipes, and loot tables. Exports a ready-to-use zip.',
+    category: 'Files',
+    tags: ['datapack', 'dialog', 'advancement', 'recipe', 'loot table', 'no-code', 'json', 'creator'],
+    badge: 'New',
+  },
+  {
     id: 'nbt',
     path: '/nbt',
     title: 'NBT Editor',

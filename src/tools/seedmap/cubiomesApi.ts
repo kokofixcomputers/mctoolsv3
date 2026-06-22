@@ -7,10 +7,11 @@ let mod: any = null
 let ready: Promise<void> | null = null
 
 // cwrapped functions
-let _setup: any, _apply: any, _biomeAt: any, _genArea: any, _findStructures: any
+let _setup: any, _apply: any, _biomeAt: any, _genArea: any, _genHeights: any, _findStructures: any
 let _findStrongholds: any, _getSpawn: any, _villageAbandoned: any
 let namePtr = 0, colorPtr = 0
 let areaPtr = 0, areaCap = 0
+let heightPtr = 0, heightCap = 0
 let outPtr = 0, outCap = 0
 let spawnPtr = 0
 
@@ -29,6 +30,7 @@ async function ensure(): Promise<void> {
     _apply = mod.cwrap('mc_apply', null, ['number', 'number', 'number'])
     _biomeAt = mod.cwrap('mc_biome_at', 'number', ['number', 'number', 'number', 'number'])
     _genArea = mod.cwrap('mc_gen_area', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number'])
+    _genHeights = mod.cwrap('mc_gen_heights', 'number', ['number', 'number', 'number', 'number', 'number'])
     _findStructures = mod.cwrap('mc_find_structures', 'number',
       ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'])
     _findStrongholds = mod.cwrap('mc_find_strongholds', 'number', ['number', 'number'])
@@ -98,6 +100,32 @@ export function genArea(scale: number, cellX: number, cellZ: number, w: number, 
   _genArea(areaPtr, scale, cellX, cellZ, w, h, y)
   // copy out of the heap (heap can move on growth)
   return mod.HEAP32.slice(areaPtr >> 2, (areaPtr >> 2) + w * h)
+}
+
+/** Approximate surface heights (blocks) for an area at 1:4 scale. qx/qz in quart coords. */
+export function genHeights(qx: number, qz: number, w: number, h: number): Float32Array {
+  const need = w * h * 4
+  if (need > heightCap) {
+    if (heightPtr) mod._mc_free(heightPtr)
+    heightPtr = mod._mc_malloc(need)
+    heightCap = need
+  }
+  _genHeights(heightPtr, qx, qz, w, h)
+  return mod.HEAPF32.slice(heightPtr >> 2, (heightPtr >> 2) + w * h)
+}
+
+/** All distinct biomes (id + display name) for the current version. */
+export function allBiomes(): { id: number; name: string }[] {
+  const seen = new Set<string>()
+  const out: { id: number; name: string }[] = []
+  for (let id = 0; id < 256; id++) {
+    const name = biomeName(id)
+    if (!name || name === 'unknown' || seen.has(name)) continue
+    seen.add(name)
+    out.push({ id, name })
+  }
+  out.sort((a, b) => a.name.localeCompare(b.name))
+  return out
 }
 
 export function biomeColors(): Uint8Array {

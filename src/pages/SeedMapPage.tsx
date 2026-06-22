@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Shuffle, Plus, Minus, Crosshair, Copy, Check, Loader2 } from 'lucide-react'
 import {
-  initCubiomes, setupWorld, applySeed, biomeColors, biomeName, biomeAt,
+  initCubiomes, setupWorld, applySeed, biomeColors, biomeName, biomeAt, genArea, allBiomes,
   findStructures, findStrongholds, getSpawn, villageAbandoned, seedToParts,
   type Dim, type SeedParts, type FoundStructure,
 } from '../tools/seedmap/cubiomesApi'
@@ -39,6 +39,13 @@ export default function SeedMapPage() {
   const [large, setLarge] = useState(false)
   const [enabledStructs, setEnabledStructs] = useState<Set<number>>(new Set([5]))
 
+  const [highlightBiome, setHighlightBiome] = useState<number>(-1)
+  const [terrain, setTerrain] = useState(false)
+  const [biomeList, setBiomeList] = useState<{ id: number; name: string }[]>([])
+  const [locateStruct, setLocateStruct] = useState<number>(5)
+  const [locating, setLocating] = useState(false)
+  const [locateMsg, setLocateMsg] = useState<string | null>(null)
+
   const [hover, setHover] = useState<{ x: number; z: number; biome: string } | null>(null)
   const [popup, setPopup] = useState<{ sx: number; sy: number; x: number; z: number; label: string } | null>(null)
 
@@ -53,6 +60,7 @@ export default function SeedMapPage() {
   const pendingRef = useRef<Map<string, number>>(new Map()) // key → request time (for retry)
   const lastScaleRef = useRef<number>(-1)
   const worldKeyRef = useRef('')
+  const lastCoreKeyRef = useRef('')
   const workerRef = useRef<Worker | null>(null)
   const workerReadyKeyRef = useRef('')
   const requestRedrawRef = useRef<(() => void) | null>(null)
@@ -106,29 +114,33 @@ export default function SeedMapPage() {
   const applyWorld = useCallback(async () => {
     if (!ready) return
     try {
+      const coreChanged = lastCoreKeyRef.current !== `${version}|${large}|${dim}|${seedInput}`
+      lastCoreKeyRef.current = `${version}|${large}|${dim}|${seedInput}`
       partsRef.current = seedToParts(seedInput)
       await setupWorld(version, large)
       applySeed(dim, partsRef.current)
       colorsRef.current = biomeColors()
+      if (coreChanged || biomeList.length === 0) setBiomeList(allBiomes())
       worldReadyRef.current = true
-      // Invalidate cached tiles for the new world.
-      const wk = `${version}|${large ? 1 : 0}|${dim}|${partsRef.current.lo}|${partsRef.current.hi}`
+      // worldKey includes highlight/terrain so tiles regenerate when those change.
+      const wk = `${version}|${large ? 1 : 0}|${dim}|${partsRef.current.lo}|${partsRef.current.hi}|h${highlightBiome}|t${terrain ? 1 : 0}`
       worldKeyRef.current = wk
-      // reset tile cache + pending for the new world
       for (const { img } of tileCacheRef.current.values()) img.close()
       tileCacheRef.current.clear()
       pendingRef.current.clear()
-      // set up the worker's generator for this world
       workerRef.current?.postMessage({
         type: 'setup', worldKey: wk, version, large, dim,
         lo: partsRef.current.lo, hi: partsRef.current.hi,
+        highlight: highlightBiome, terrain,
       })
-      // Global (non-region) markers — only meaningful in the Overworld.
-      if (dim === 0) {
-        try { globalMarkersRef.current = { stronghold: findStrongholds(40), spawn: [getSpawn()] } }
-        catch { globalMarkersRef.current = { stronghold: [], spawn: [] } }
-      } else {
-        globalMarkersRef.current = { stronghold: [], spawn: [] }
+      // Global (non-region) markers — only recompute when the core world changed.
+      if (coreChanged) {
+        if (dim === 0) {
+          try { globalMarkersRef.current = { stronghold: findStrongholds(40), spawn: [getSpawn()] } }
+          catch { globalMarkersRef.current = { stronghold: [], spawn: [] } }
+        } else {
+          globalMarkersRef.current = { stronghold: [], spawn: [] }
+        }
       }
       computeStructures()
       requestRedraw()
@@ -136,7 +148,7 @@ export default function SeedMapPage() {
       setError(e instanceof Error ? e.message : 'Generation error')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, seedInput, version, dim, large])
+  }, [ready, seedInput, version, dim, large, highlightBiome, terrain])
 
   useEffect(() => { applyWorld() }, [applyWorld])
 
@@ -400,6 +412,69 @@ export default function SeedMapPage() {
     computeStructures(); requestRedraw()
   }
 
+  // ── Locate (find nearest + jump) ───────────────────────────────────────────────
+  function jumpTo(x: number, z: number, label: string) {
+    const canvas = canvasRef.current
+    viewRef.current = { ...viewRef.current, cx: x, cz: z }
+    computeStructures(); requestRedraw()
+    if (canvas) setPopup({ sx: canvas.width / 2, sy: canvas.height / 2, x, z, label })
+  }
+
+  function findNearestBiome(id: number): { x: number; z: number } | null {
+    const { cx, cz } = viewRef.current
+    const scale = 16, R = 768 // ±~12k blocks at 16-block resolution
+    const cellX0 = Math.floor(cx / scale) - R, cellZ0 = Math.floor(cz / scale) - R
+    const w = R * 2, h = R * 2
+    let ids: Int32Array
+    try { ids = genArea(scale, cellX0, cellZ0, w, h, 15) } catch { return null }
+    let best: { x: number; z: number } | null = null, bestD = Infinity
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      if (ids[j * w + i] !== id) continue
+      const bx = (cellX0 + i) * scale + 8, bz = (cellZ0 + j) * scale + 8
+      const d = (bx - cx) ** 2 + (bz - cz) ** 2
+      if (d < bestD) { bestD = d; best = { x: bx, z: bz } }
+    }
+    return best
+  }
+
+  function findNearestStructure(type: number): { x: number; z: number } | null {
+    const { cx, cz } = viewRef.current
+    for (const r of [3000, 8000, 20000, 50000]) {
+      let pts: FoundStructure[]
+      try { pts = findStructures(type, partsRef.current, cx - r, cz - r, cx + r, cz + r, 8000) }
+      catch { return null }
+      if (pts.length) {
+        let best = pts[0], bestD = Infinity
+        for (const p of pts) { const d = (p.x - cx) ** 2 + (p.z - cz) ** 2; if (d < bestD) { bestD = d; best = p } }
+        return best
+      }
+    }
+    return null
+  }
+
+  function locateBiome() {
+    if (highlightBiome < 0) return
+    setLocating(true); setLocateMsg(null)
+    // let the spinner paint before the (sync) search
+    setTimeout(() => {
+      const r = findNearestBiome(highlightBiome)
+      setLocating(false)
+      if (r) jumpTo(r.x, r.z, biomeName(highlightBiome))
+      else setLocateMsg('Not found within ~12k blocks — pan closer and retry.')
+    }, 20)
+  }
+
+  function locateStructure() {
+    setLocating(true); setLocateMsg(null)
+    setTimeout(() => {
+      const r = findNearestStructure(locateStruct)
+      setLocating(false)
+      const def = STRUCTURES.find(s => s.type === locateStruct)
+      if (r) jumpTo(r.x, r.z, def?.label ?? 'Structure')
+      else setLocateMsg('None found nearby.')
+    }, 20)
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────────
   return (
     <div className="section container">
@@ -447,6 +522,46 @@ export default function SeedMapPage() {
           <input type="checkbox" checked={large} onChange={e => setLarge(e.target.checked)} style={{ accentColor: 'rgb(var(--accent))' }} />
           Large Biomes
         </label>
+        <label className="flex items-center gap-1.5 text-sm cursor-pointer pb-1.5" style={{ color: 'rgb(var(--muted))' }} title="Hill-shade by approximate surface height (best zoomed in)">
+          <input type="checkbox" checked={terrain} onChange={e => setTerrain(e.target.checked)} style={{ accentColor: 'rgb(var(--accent))' }} />
+          Terrain
+        </label>
+      </div>
+
+      {/* Locate */}
+      <div className="card flex flex-wrap items-end gap-4 mb-4">
+        <div className="flex items-end gap-2">
+          <div>
+            <label className="form-label flex items-center gap-1"><Crosshair className="w-3.5 h-3.5" /> Highlight biome</label>
+            <select className="form-input text-sm" value={highlightBiome} onChange={e => setHighlightBiome(Number(e.target.value))} style={{ minWidth: 160 }}>
+              <option value={-1}>— none —</option>
+              {biomeList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+          <button onClick={locateBiome} disabled={highlightBiome < 0 || locating}
+            className="px-3 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
+            style={{ border: '1px solid rgb(var(--accent))', color: 'rgb(var(--accent))' }}>
+            Find nearest
+          </button>
+        </div>
+        <div className="flex items-end gap-2">
+          <div>
+            <label className="form-label">Locate structure</label>
+            <select className="form-input text-sm" value={locateStruct} onChange={e => setLocateStruct(Number(e.target.value))} style={{ minWidth: 150 }}>
+              {STRUCTURES.filter(s => s.dims.includes(dim) && s.type >= 0).map(s => <option key={`${s.type}-${s.label}`} value={s.type}>{s.label}</option>)}
+            </select>
+          </div>
+          <button onClick={locateStructure} disabled={locating}
+            className="px-3 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
+            style={{ border: '1px solid rgb(var(--accent))', color: 'rgb(var(--accent))' }}>
+            Find nearest
+          </button>
+        </div>
+        {locating && <span className="text-sm pb-2" style={{ color: 'rgb(var(--muted))' }}>Searching…</span>}
+        {locateMsg && <span className="text-sm pb-2" style={{ color: '#d98a1e' }}>{locateMsg}</span>}
+        {highlightBiome >= 0 && (
+          <span className="text-xs pb-2" style={{ color: 'rgb(var(--muted))' }}>Other biomes dimmed — clear to —none— to restore.</span>
+        )}
       </div>
 
       {/* Map */}

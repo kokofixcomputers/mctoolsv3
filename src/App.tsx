@@ -30,6 +30,7 @@ import XpCalculatorPage from './pages/XpCalculatorPage'
 import PortalCalculatorPage from './pages/PortalCalculatorPage'
 import PiglinBarterPage from './pages/PiglinBarterPage'
 import SeedMapPage from './pages/SeedMapPage'
+import DatapackPage from './pages/DatapackPage'
 
 export default function App() {
   return (
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="portal" element={<PortalCalculatorPage />} />
             <Route path="piglin" element={<PiglinBarterPage />} />
             <Route path="seed-map" element={<SeedMapPage />} />
+            <Route path="datapack" element={<DatapackPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

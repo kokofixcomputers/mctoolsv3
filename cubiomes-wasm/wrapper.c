@@ -10,6 +10,8 @@
 static Generator g;
 static int g_mc = MC_NEWEST;
 static uint64_t g_seed = 0;
+static SurfaceNoise g_sn;
+static int g_dim = 0;
 
 // Set up the generator for a version string ("1.21", "1.18", ...) and large-biomes flag.
 EMSCRIPTEN_KEEPALIVE
@@ -27,7 +29,16 @@ EMSCRIPTEN_KEEPALIVE
 void mc_apply(int dim, unsigned int seedLo, unsigned int seedHi) {
     uint64_t seed = ((uint64_t)seedHi << 32) | (uint64_t)seedLo;
     g_seed = seed;
+    g_dim = dim;
     applySeed(&g, dim, seed);
+    initSurfaceNoise(&g_sn, dim, seed);
+}
+
+// Approximate Overworld surface height (in blocks) for an area at 1:4 scale.
+// qx,qz and w,h are in quart (biome) coordinates. Writes w*h floats into out.
+EMSCRIPTEN_KEEPALIVE
+int mc_gen_heights(float* out, int qx, int qz, int w, int h) {
+    return mapApproxHeight(out, NULL, &g, &g_sn, qx, qz, w, h);
 }
 
 // Single block-position biome id.
