@@ -23,6 +23,8 @@ import PlayerLookupPage from './pages/PlayerLookupPage'
 import ResourcePackMergerPage from './pages/ResourcePackMergerPage'
 import SlimeChunkPage from './pages/SlimeChunkPage'
 import PixelArtPage from './pages/PixelArtPage'
+import SchematicViewerPage from './pages/SchematicViewerPage'
+import SchematicConverterPage from './pages/SchematicConverterPage'
 
 export default function App() {
   return (
@@ -52,6 +54,8 @@ export default function App() {
             <Route path="resource-pack-merger" element={<ResourcePackMergerPage />} />
             <Route path="slime-chunks" element={<SlimeChunkPage />} />
             <Route path="pixel-art" element={<PixelArtPage />} />
+            <Route path="schematic-viewer" element={<SchematicViewerPage />} />
+            <Route path="schematic-converter" element={<SchematicConverterPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

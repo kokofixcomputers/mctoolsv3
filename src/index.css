@@ -247,3 +247,19 @@
 input[type='color'] { padding: 0; border: 0; cursor: pointer; height: 36px; width: 36px; border-radius: 6px; }
 input[type='range'] { accent-color: rgb(var(--accent)); }
 .pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+/* Dual-handle range sliders (schematic viewer bounds) */
+.range-thumb { -webkit-appearance: none; appearance: none; }
+.range-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 2px solid rgba(0,0,0,0.3);
+  cursor: pointer; pointer-events: auto; margin-top: 0;
+}
+.range-thumb::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 2px solid rgba(0,0,0,0.3);
+  cursor: pointer; pointer-events: auto;
+}
+.range-thumb::-webkit-slider-runnable-track { background: transparent; }
+.range-thumb::-moz-range-track { background: transparent; }

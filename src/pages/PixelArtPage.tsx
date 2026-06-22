@@ -175,13 +175,16 @@ function quantize(
 
 const DATA_VERSIONS: Record<string, number> = { '1.21.1': 3953, '1.21.4': 4189, '1.21.5': 4325 }
 
+type Orientation = 'floor' | 'wall'
+
 async function buildPixelSchematic(
-  blockIndices: number[],   // palette index per cell, row-major (z outer, x inner)
+  blockIndices: number[],   // palette index per cell, row-major (imgRow outer, imgCol inner)
   palette: BlockDef[],
-  width: number,
-  length: number,
+  imgWidth: number,         // image columns
+  imgHeight: number,        // image rows
   name: string,
   mcVersion?: string,
+  orientation: Orientation = 'floor',
 ): Promise<Uint8Array> {
   const dataVer = (mcVersion ? DATA_VERSIONS[mcVersion] : undefined) ?? 3953
 
@@ -191,11 +194,28 @@ async function buildPixelSchematic(
   const palArr = Array.from(usedIds)
   const palIdx = new Map<string, number>(palArr.map((id, i) => [id, i]))
 
+  // Sponge schematic block data is ordered y → z → x (x fastest).
+  //  • floor: lies flat, viewed from above. W=imgWidth, H=1, L=imgHeight.
+  //           image row → Z, image col → X.
+  //  • wall:  stands vertically. W=imgWidth, H=imgHeight, L=1.
+  //           image col → X, image row → Y (flipped so the top of the image is up).
+  let schemW: number, schemH: number, schemL: number
   const blockDataArr: number[] = []
-  for (let z = 0; z < length; z++) {
-    for (let x = 0; x < width; x++) {
-      const bi = blockIndices[z * width + x]
-      blockDataArr.push(...varint(palIdx.get(palette[bi].id)!))
+  const push = (imgRow: number, imgCol: number) => {
+    const bi = blockIndices[imgRow * imgWidth + imgCol]
+    blockDataArr.push(...varint(palIdx.get(palette[bi].id)!))
+  }
+
+  if (orientation === 'wall') {
+    schemW = imgWidth; schemH = imgHeight; schemL = 1
+    for (let y = 0; y < schemH; y++) {            // y outer
+      const imgRow = imgHeight - 1 - y            // flip vertically
+      for (let x = 0; x < schemW; x++) push(imgRow, x)
+    }
+  } else {
+    schemW = imgWidth; schemH = 1; schemL = imgHeight
+    for (let z = 0; z < schemL; z++) {            // z outer (image rows)
+      for (let x = 0; x < schemW; x++) push(z, x)
     }
   }
 
@@ -211,9 +231,9 @@ async function buildPixelSchematic(
         w.long('Date', Math.floor(now / 0x100000000), now >>> 0)
         w.emptyList('RequiredMods', 8)
       })
-      w.short('Width', width)
-      w.short('Height', 1)
-      w.short('Length', length)
+      w.short('Width', schemW)
+      w.short('Height', schemH)
+      w.short('Length', schemL)
       w.intArray('Offset', [0, 0, 0])
       w.compound('Blocks', () => {
         w.compound('Palette', () => {
@@ -339,6 +359,7 @@ export default function PixelArtPage() {
   const [dither, setDither] = useState(true)
   const [showGrid, setShowGrid] = useState(true)
   const [cellSize, setCellSize] = useState(10)
+  const [orientation, setOrientation] = useState<Orientation>('wall')
   const [catFilter, setCatFilter] = useState<string>('Concrete')
   const [enabledIds, setEnabledIds] = useState<Set<string>>(
     new Set(BLOCKS.filter(b => b.category === 'Concrete').map(b => b.id))
@@ -477,7 +498,7 @@ export default function PixelArtPage() {
     if (!blockIndices || palette.length === 0) return
     setExporting(true)
     try {
-      const data = await buildPixelSchematic(blockIndices, palette, targetW, targetH, imgName || 'pixel-art', version.id)
+      const data = await buildPixelSchematic(blockIndices, palette, targetW, targetH, imgName || 'pixel-art', version.id, orientation)
       downloadBlob(data, `${imgName || 'pixel-art'}.schem`)
     } finally {
       setExporting(false)
@@ -664,6 +685,32 @@ export default function PixelArtPage() {
           {/* Export */}
           <div className="card space-y-3">
             <h3 className="font-semibold" style={{ color: 'rgb(var(--text))' }}>Export</h3>
+
+            {/* Orientation */}
+            <div>
+              <label className="form-label">Orientation</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { id: 'wall', label: 'Standing up', hint: 'Vertical wall' },
+                  { id: 'floor', label: 'Floor', hint: 'Flat on ground' },
+                ] as const).map(o => (
+                  <button
+                    key={o.id}
+                    onClick={() => setOrientation(o.id)}
+                    className="rounded-xl px-3 py-2 text-sm font-medium transition-all text-left"
+                    style={{
+                      border: `1px solid ${orientation === o.id ? 'rgb(var(--accent))' : 'rgb(var(--border))'}`,
+                      background: orientation === o.id ? 'rgb(var(--accent) / 0.1)' : 'transparent',
+                      color: orientation === o.id ? 'rgb(var(--accent))' : 'rgb(var(--muted))',
+                    }}
+                  >
+                    {o.label}
+                    <span className="block text-xs font-normal" style={{ opacity: 0.7 }}>{o.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex flex-col gap-2">
               <button onClick={exportPng} disabled={!blockIndices}
                 className="btn-secondary flex items-center justify-center gap-2 py-2 disabled:opacity-40">
@@ -676,7 +723,9 @@ export default function PixelArtPage() {
               </button>
             </div>
             <p className="text-xs" style={{ color: 'rgb(var(--muted))' }}>
-              Flat 1-layer schematic. Load with <code className="font-mono">//schem load</code> in WorldEdit.
+              {orientation === 'wall'
+                ? <>Vertical {targetW}×{targetH} wall (1 block thick). Load with <code className="font-mono">//schem load</code> in WorldEdit.</>
+                : <>Flat {targetW}×{targetH} floor (1 layer), viewed from above. Load with <code className="font-mono">//schem load</code> in WorldEdit.</>}
             </p>
           </div>
 

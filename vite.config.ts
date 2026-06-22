@@ -12,6 +12,13 @@ export default defineConfig({
       buffer: 'buffer',
     },
   },
+  // Don't esbuild-prebundle the wasm-bindgen package: that breaks its
+  // `new URL('nucleation_bg.wasm', import.meta.url)` asset resolution in dev
+  // (the fetch falls back to index.html). Excluding it lets Vite's normal
+  // asset pipeline rewrite the URL correctly.
+  optimizeDeps: {
+    exclude: ['nucleation'],
+  },
   worker: {
     format: 'es',
     rollupOptions: {
