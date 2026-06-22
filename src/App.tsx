@@ -25,6 +25,11 @@ import SlimeChunkPage from './pages/SlimeChunkPage'
 import PixelArtPage from './pages/PixelArtPage'
 import SchematicViewerPage from './pages/SchematicViewerPage'
 import SchematicConverterPage from './pages/SchematicConverterPage'
+import RedstonePlaygroundPage from './pages/RedstonePlaygroundPage'
+import XpCalculatorPage from './pages/XpCalculatorPage'
+import PortalCalculatorPage from './pages/PortalCalculatorPage'
+import PiglinBarterPage from './pages/PiglinBarterPage'
+import SeedMapPage from './pages/SeedMapPage'
 
 export default function App() {
   return (
@@ -56,6 +61,11 @@ export default function App() {
             <Route path="pixel-art" element={<PixelArtPage />} />
             <Route path="schematic-viewer" element={<SchematicViewerPage />} />
             <Route path="schematic-converter" element={<SchematicConverterPage />} />
+            <Route path="redstone" element={<RedstonePlaygroundPage />} />
+            <Route path="xp" element={<XpCalculatorPage />} />
+            <Route path="portal" element={<PortalCalculatorPage />} />
+            <Route path="piglin" element={<PiglinBarterPage />} />
+            <Route path="seed-map" element={<SeedMapPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

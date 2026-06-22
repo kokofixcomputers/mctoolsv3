@@ -22,6 +22,8 @@ export type GiveAttributeModifier = {
 
 export type PotionEffect = { id: string; amplifier: number; duration: number }
 
+export type FoodEffect = { id: string; amplifier: number; duration: number; probability: number }
+
 export type PotionOptions = {
   target?: string
   count?: number
@@ -110,6 +112,7 @@ export type GiveOptions = {
   saturation?: number
   canAlwaysEat?: boolean
   consumeSeconds?: number   // modern-new: consumable={consume_seconds:X}; modern-old: food.eat_seconds
+  foodEffects?: FoodEffect[]  // effects applied when eaten
 
   // Equippable (modern-new only)
   equippableSlot?: EquippableSlot
@@ -264,6 +267,8 @@ export function buildGiveCommand(opts: GiveOptions): string {
     }`)
   }
 
+  const validFoodEffects = (opts.foodEffects ?? []).filter((e) => e.id.trim())
+
   // food component
   const hasFood = opts.nutrition !== undefined || opts.saturation !== undefined || opts.canAlwaysEat
   if (hasFood) {
@@ -271,16 +276,30 @@ export function buildGiveCommand(opts: GiveOptions): string {
     if (opts.nutrition !== undefined) fp.push(`nutrition:${opts.nutrition}`)
     if (opts.saturation !== undefined) fp.push(`saturation:${opts.saturation}`)
     if (opts.canAlwaysEat) fp.push('can_always_eat:1b')
-    // 1.21.1: eat_seconds lives inside food
+    // 1.21.1: eat_seconds + effects live inside food
     if (fmt === 'modern-old' && opts.consumeSeconds !== undefined) {
       fp.push(`eat_seconds:${opts.consumeSeconds}`)
+    }
+    if (fmt === 'modern-old' && validFoodEffects.length) {
+      const eff = validFoodEffects.map((e) =>
+        `{effect:{id:${snbtStr(normalizeId(e.id))},amplifier:${e.amplifier},duration:${e.duration}},probability:${e.probability}}`
+      )
+      fp.push(`effects:[${eff.join(',')}]`)
     }
     c.push(`food={${fp.join(',')}}`)
   }
 
-  // consumable (modern-new only — 1.21.2+)
-  if (fmt === 'modern-new' && opts.consumeSeconds !== undefined) {
-    c.push(`consumable={consume_seconds:${opts.consumeSeconds}}`)
+  // consumable (modern-new only — 1.21.2+): holds eat time AND on-eat effects
+  if (fmt === 'modern-new') {
+    const cp: string[] = []
+    if (opts.consumeSeconds !== undefined) cp.push(`consume_seconds:${opts.consumeSeconds}`)
+    if (validFoodEffects.length) {
+      const eff = validFoodEffects.map((e) =>
+        `{type:"minecraft:apply_effects",effects:[{id:${snbtStr(normalizeId(e.id))},amplifier:${e.amplifier},duration:${e.duration}}],probability:${e.probability}}`
+      )
+      cp.push(`on_consume_effects:[${eff.join(',')}]`)
+    }
+    if (cp.length) c.push(`consumable={${cp.join(',')}}`)
   }
 
   // equippable (modern-new only)

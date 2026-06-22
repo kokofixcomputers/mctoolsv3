@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, X, Copy, Check, Package, FlaskConical, Rocket, Archive } from 'lucide-react'
+import { Plus, X, Copy, Check, Package, FlaskConical, Rocket, Archive, Apple } from 'lucide-react'
 import { ItemPicker, containerFilter } from '../components/ItemPicker'
 import { RichNameEditor, RichLoreEditor, type RichLine, type RichLines } from '../components/RichTextEditor'
 import { serializeNameSegs, serializeLoreSegs } from '../types/richText'
@@ -17,6 +17,7 @@ import {
   type TextStyle,
   type EquippableSlot,
   type ItemRarity,
+  type FoodEffect,
 } from '../tools/give/giveCommand'
 import { VERSIONS, GLOBAL_VERSION_FORMAT } from '../tools/give/versions'
 import { useVersion } from '../contexts/VersionContext'
@@ -409,6 +410,159 @@ function ItemGenerator() {
   )
 }
 
+// ── Food generator ──────────────────────────────────────────────────────────────
+
+const FOOD_PRESETS = [
+  { label: 'Apple', n: 4, s: 2.4 },
+  { label: 'Bread', n: 5, s: 6 },
+  { label: 'Steak', n: 8, s: 12.8 },
+  { label: 'Golden Apple', n: 4, s: 9.6 },
+  { label: 'Cookie', n: 2, s: 0.4 },
+]
+
+function FoodGenerator() {
+  const { version } = useVersion()
+  const fmt = GLOBAL_VERSION_FORMAT[version.id] ?? 'modern-new'
+  const isNew = fmt === 'modern-new'
+  const richFmt = (fmt === 'modern-new' || fmt === 'modern-old') ? fmt : null
+
+  const [target, setTarget] = useState('@p')
+  const [itemId, setItemId] = useState('paper')
+  const [count, setCount] = useState(1)
+  const [customNameSegs, setCustomNameSegs] = useState<RichLine>([])
+  const [itemNameSegs, setItemNameSegs] = useState<RichLine>([])
+  const [loreLines, setLoreLines] = useState<RichLines>([[]])
+
+  const [nutrition, setNutrition] = useState(4)
+  const [saturation, setSaturation] = useState(2.4)
+  const [canAlwaysEat, setCanAlwaysEat] = useState(false)
+  const [customEat, setCustomEat] = useState(false)
+  const [eatSeconds, setEatSeconds] = useState(1.6)
+  const [effects, setEffects] = useState<FoodEffect[]>([])
+
+  const { command, error } = useMemo(() => {
+    try {
+      const c: string[] = []
+      if (richFmt) {
+        const cnSegs = customNameSegs.filter(s => s.text)
+        if (cnSegs.length) c.push(`custom_name=${serializeNameSegs(cnSegs, richFmt, true)}`)
+        const loreFiltered = loreLines.filter(l => l.some(s => s.text))
+        if (loreFiltered.length) c.push(`lore=${serializeLoreSegs(loreFiltered, richFmt)}`)
+        const inSegs = itemNameSegs.filter(s => s.text)
+        if (inSegs.length) c.push(`item_name=${serializeNameSegs(inSegs, richFmt)}`)
+      }
+      return {
+        command: buildGiveCommand({
+          format: fmt, target, itemId, count,
+          nutrition, saturation,
+          canAlwaysEat,
+          consumeSeconds: customEat ? eatSeconds : undefined,
+          foodEffects: effects.length ? effects : undefined,
+          _extraComponents: c,
+        } as never),
+        error: '',
+      }
+    } catch (e) { return { command: '', error: e instanceof Error ? e.message : 'Error' } }
+  }, [fmt, richFmt, target, itemId, count, customNameSegs, itemNameSegs, loreLines,
+      nutrition, saturation, canAlwaysEat, customEat, eatSeconds, effects])
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 space-y-4">
+
+        <SectionCard title="Edible Item">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">Target</label>
+              <input className="form-input" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="@p" />
+            </div>
+            <div>
+              <label className="form-label">Item ID</label>
+              <ItemPicker value={itemId} onChange={setItemId} placeholder="paper" />
+            </div>
+            <div>
+              <label className="form-label">Count</label>
+              <input type="number" min={1} max={99} className="form-input" value={count}
+                onChange={(e) => setCount(Math.max(1, parseInt(e.target.value) || 1))} />
+            </div>
+          </div>
+          <p className="text-xs" style={{ color: 'rgb(var(--muted))' }}>
+            Any item works — the food component makes it edible regardless of what it normally is.
+          </p>
+        </SectionCard>
+
+        <SectionCard title="Food Properties">
+          <div className="flex flex-wrap gap-1.5 mb-1">
+            {FOOD_PRESETS.map((p) => (
+              <button key={p.label} onClick={() => { setNutrition(p.n); setSaturation(p.s) }}
+                className="btn-ghost rounded-lg px-2.5 py-1 text-xs"
+                style={{ border: '1px solid rgb(var(--border))' }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">Nutrition (½ hunger)</label>
+              <input type="number" min={0} className="form-input" value={nutrition} onChange={(e) => setNutrition(Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="form-label">Saturation</label>
+              <input type="number" min={0} step={0.1} className="form-input" value={saturation} onChange={(e) => setSaturation(Number(e.target.value))} />
+            </div>
+            <div className="flex items-end pb-1">
+              <Toggle label="Can Always Eat" active={canAlwaysEat} onClick={() => setCanAlwaysEat((v) => !v)} />
+            </div>
+          </div>
+          <div className="pt-1">
+            <Toggle label={isNew ? 'Custom eat duration (consumable)' : 'Custom eat duration (eat_seconds)'} active={customEat} onClick={() => setCustomEat((v) => !v)} />
+            {customEat && (
+              <div className="mt-2 flex items-center gap-3">
+                <input type="number" min={0} step={0.1} className="form-input w-32" value={eatSeconds} onChange={(e) => setEatSeconds(Number(e.target.value))} />
+                <span className="text-sm" style={{ color: 'rgb(var(--muted))' }}>seconds (default 1.6)</span>
+              </div>
+            )}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Effects When Eaten" action={<AddBtn onClick={() => setEffects((p) => [...p, { id: 'regeneration', amplifier: 0, duration: 100, probability: 1 }])} />}>
+          {effects.length === 0 && <p className="text-sm" style={{ color: 'rgb(var(--muted))' }}>No effects. Add one to apply a status effect on consumption.</p>}
+          {effects.length > 0 && (
+            <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 text-xs font-medium pb-1" style={{ color: 'rgb(var(--muted))' }}>
+              <span>Effect</span><span className="w-16">Amplifier</span><span className="w-24">Duration (t)</span><span className="w-20">Chance</span><span></span>
+            </div>
+          )}
+          <div className="space-y-2">
+            {effects.map((ef, i) => (
+              <div key={i} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center">
+                <select className="form-input text-sm" value={ef.id}
+                  onChange={(e) => setEffects((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))}>
+                  {EFFECTS.map((e) => <option key={e} value={e}>{e}</option>)}
+                </select>
+                <input type="number" min={0} className="form-input text-sm w-16" value={ef.amplifier}
+                  onChange={(e) => setEffects((p) => p.map((x, j) => j === i ? { ...x, amplifier: Number(e.target.value) } : x))} />
+                <input type="number" min={1} className="form-input text-sm w-24" value={ef.duration}
+                  onChange={(e) => setEffects((p) => p.map((x, j) => j === i ? { ...x, duration: Number(e.target.value) } : x))} />
+                <input type="number" min={0} max={1} step={0.05} className="form-input text-sm w-20" value={ef.probability}
+                  onChange={(e) => setEffects((p) => p.map((x, j) => j === i ? { ...x, probability: Number(e.target.value) } : x))} />
+                <RemoveBtn onClick={() => setEffects((p) => p.filter((_, j) => j !== i))} />
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Display">
+          <RichNameEditor label="Item Name" hint="— item_name" value={itemNameSegs} onChange={setItemNameSegs} placeholder="Mystery Snack" />
+          <RichNameEditor label="Custom Name" hint="— custom_name (italic by default)" value={customNameSegs} onChange={setCustomNameSegs} placeholder="Tasty Paper" defaultItalic />
+          <RichLoreEditor value={loreLines} onChange={setLoreLines} />
+        </SectionCard>
+
+      </div>
+      <div><OutputCard command={command} error={error} /></div>
+    </div>
+  )
+}
+
 // ── Potion generator ──────────────────────────────────────────────────────────
 
 function PotionGenerator() {
@@ -659,10 +813,11 @@ function ContainerGenerator() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = 'item' | 'potion' | 'firework' | 'container'
+type Tab = 'item' | 'food' | 'potion' | 'firework' | 'container'
 
 const TABS: { id: Tab; label: string; Icon: typeof Package }[] = [
   { id: 'item',      label: 'Item',      Icon: Package },
+  { id: 'food',      label: 'Food',      Icon: Apple },
   { id: 'potion',    label: 'Potion',    Icon: FlaskConical },
   { id: 'firework',  label: 'Firework',  Icon: Rocket },
   { id: 'container', label: 'Container', Icon: Archive },
@@ -714,6 +869,7 @@ export default function GivePage() {
       </div>
 
       {tab === 'item'      && <ItemGenerator />}
+      {tab === 'food'      && <FoodGenerator />}
       {tab === 'potion'    && <PotionGenerator />}
       {tab === 'firework'  && <FireworkGenerator />}
       {tab === 'container' && <ContainerGenerator />}
