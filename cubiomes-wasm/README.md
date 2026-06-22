@@ -1,8 +1,13 @@
 # cubiomes-wasm
 
-Vendored [cubiomes](https://github.com/Cubitect/cubiomes) (Cubitect's C biome/structure
-generation library) plus our thin `wrapper.c`, compiled to WebAssembly for the **Seed Map**
-tool (`/seed-map`).
+Vendored [cubiomes — xpple's active fork](https://github.com/xpple/cubiomes) (C biome/
+structure generation, based on Cubitect's original) plus our thin `wrapper.c`, compiled to
+WebAssembly for the **Seed Map** tool (`/seed-map`).
+
+The fork adds versions up to **26.2** (incl. the **`sulfur_caves`** biome), plus ore/ore-vein
+generation, terrain noise, structure loot, and more — which is why we migrated to it (Cubitect's
+upstream has been dormant for years). The vendored tree includes the `features/` and `loot/`
+subdirectories the fork's `finders.c` depends on.
 
 ## Build
 

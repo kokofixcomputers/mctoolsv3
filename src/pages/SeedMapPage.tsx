@@ -7,7 +7,14 @@ import {
 } from '../tools/seedmap/cubiomesApi'
 import { STRUCTURES, ZOMBIE_VILLAGE_DEF, type StructureDef } from '../tools/seedmap/structures'
 
-const VERSIONS = ['1.21', '1.20', '1.19', '1.18', '1.17', '1.16', '1.15', '1.14', '1.13', '1.12', '1.8', '1.7']
+const VERSIONS = ['26.2', '26.1', '1.21.11', '1.21.9', '1.21.5', '1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20', '1.19.4', '1.18', '1.17', '1.16.5', '1.15', '1.14', '1.13', '1.12', '1.8', '1.7']
+// Block-Y presets for sampling — cave biomes (sulfur caves, lush, deep dark…) only
+// appear underground, so a layer selector is needed to see them.
+const LAYERS = [
+  { label: 'Surface', y: 63 },
+  { label: 'Caves (Y -16)', y: -16 },
+  { label: 'Deep (Y -48)', y: -48 },
+]
 const SCALES = [1, 4, 16, 64, 256]
 const TILE = 128                 // biome cells per cached tile
 const TILE_CACHE_CAP = 600       // max cached tile bitmaps before eviction
@@ -34,9 +41,10 @@ export default function SeedMapPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [seedInput, setSeedInput] = useState('1231234')
-  const [version, setVersion] = useState('1.21')
+  const [version, setVersion] = useState('1.21.11')
   const [dim, setDim] = useState<Dim>(0)
   const [large, setLarge] = useState(false)
+  const [layerY, setLayerY] = useState(63)
   const [enabledStructs, setEnabledStructs] = useState<Set<number>>(new Set([5]))
 
   const [highlightBiome, setHighlightBiome] = useState<number>(-1)
@@ -123,7 +131,7 @@ export default function SeedMapPage() {
       if (coreChanged || biomeList.length === 0) setBiomeList(allBiomes())
       worldReadyRef.current = true
       // worldKey includes highlight/terrain so tiles regenerate when those change.
-      const wk = `${version}|${large ? 1 : 0}|${dim}|${partsRef.current.lo}|${partsRef.current.hi}|h${highlightBiome}|t${terrain ? 1 : 0}`
+      const wk = `${version}|${large ? 1 : 0}|${dim}|${partsRef.current.lo}|${partsRef.current.hi}|h${highlightBiome}|t${terrain ? 1 : 0}|y${layerY}`
       worldKeyRef.current = wk
       for (const { img } of tileCacheRef.current.values()) img.close()
       tileCacheRef.current.clear()
@@ -131,7 +139,7 @@ export default function SeedMapPage() {
       workerRef.current?.postMessage({
         type: 'setup', worldKey: wk, version, large, dim,
         lo: partsRef.current.lo, hi: partsRef.current.hi,
-        highlight: highlightBiome, terrain,
+        highlight: highlightBiome, terrain, layerY,
       })
       // Global (non-region) markers — only recompute when the core world changed.
       if (coreChanged) {
@@ -148,7 +156,7 @@ export default function SeedMapPage() {
       setError(e instanceof Error ? e.message : 'Generation error')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, seedInput, version, dim, large, highlightBiome, terrain])
+  }, [ready, seedInput, version, dim, large, highlightBiome, terrain, layerY])
 
   useEffect(() => { applyWorld() }, [applyWorld])
 
@@ -344,7 +352,7 @@ export default function SeedMapPage() {
     // hover biome readout
     if (worldReadyRef.current) {
       try {
-        const id = biomeAtThrottled(wx, wz)
+        const id = biomeAtThrottled(wx, wz, layerY)
         setHover({ x: wx, z: wz, biome: id == null ? '…' : biomeName(id) })
       } catch { /* noop */ }
     }
@@ -361,7 +369,7 @@ export default function SeedMapPage() {
     const wx = Math.round(cx + (mx - canvas.width / 2) * bpp)
     const wz = Math.round(cz + (my - canvas.height / 2) * bpp)
     // snap to a nearby structure marker if close
-    let label = worldReadyRef.current ? biomeName(biomeAt1(wx, wz)) : ''
+    let label = worldReadyRef.current ? biomeName(biomeAt1(wx, wz, layerY)) : ''
     let px = wx, pz = wz
     for (const { def, pts } of structMarkersRef.current) {
       for (const p of pts) {
@@ -426,7 +434,7 @@ export default function SeedMapPage() {
     const cellX0 = Math.floor(cx / scale) - R, cellZ0 = Math.floor(cz / scale) - R
     const w = R * 2, h = R * 2
     let ids: Int32Array
-    try { ids = genArea(scale, cellX0, cellZ0, w, h, 15) } catch { return null }
+    try { ids = genArea(scale, cellX0, cellZ0, w, h, Math.floor(layerY / 4)) } catch { return null }
     let best: { x: number; z: number } | null = null, bestD = Infinity
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
       if (ids[j * w + i] !== id) continue
@@ -526,6 +534,14 @@ export default function SeedMapPage() {
           <input type="checkbox" checked={terrain} onChange={e => setTerrain(e.target.checked)} style={{ accentColor: 'rgb(var(--accent))' }} />
           Terrain
         </label>
+        {dim === 0 && (
+          <div>
+            <label className="form-label">Layer</label>
+            <select className="form-input text-sm" value={layerY} onChange={e => setLayerY(Number(e.target.value))} title="Cave biomes (sulfur caves, lush, deep dark) only appear underground">
+              {LAYERS.map(l => <option key={l.y} value={l.y}>{l.label}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Locate */}
@@ -653,14 +669,14 @@ export default function SeedMapPage() {
 // ── biome sampling throttle ───────────────────────────────────────────────────────
 let lastSample = 0
 let lastId: number | null = null
-function biomeAtThrottled(x: number, z: number): number | null {
+function biomeAtThrottled(x: number, z: number, y: number): number | null {
   const now = performance.now()
   if (now - lastSample < 30) return lastId
   lastSample = now
-  lastId = biomeAt(1, x, 63, z)
+  lastId = biomeAt(1, x, y, z)
   return lastId
 }
-function biomeAt1(x: number, z: number): number { return biomeAt(1, x, 63, z) }
+function biomeAt1(x: number, z: number, y: number): number { return biomeAt(1, x, y, z) }
 
 // ── small components ─────────────────────────────────────────────────────────────
 function IconBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {

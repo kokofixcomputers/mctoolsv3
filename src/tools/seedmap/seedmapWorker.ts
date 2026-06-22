@@ -11,8 +11,9 @@ let colors: Uint8Array | null = null
 let curWorldKey = ''
 let highlight = -1       // biome id to keep bright (others darkened); -1 = off
 let terrain = false      // hill-shade by approximate surface height
+let layerY = 63          // block Y to sample biomes at (cave biomes need a low Y)
 
-type SetupMsg = { type: 'setup'; worldKey: string; version: string; large: boolean; dim: -1 | 0 | 1; lo: number; hi: number; highlight: number; terrain: boolean }
+type SetupMsg = { type: 'setup'; worldKey: string; version: string; large: boolean; dim: -1 | 0 | 1; lo: number; hi: number; highlight: number; terrain: boolean; layerY: number }
 type TileMsg = { type: 'tile'; worldKey: string; key: string; scale: number; tx: number; tz: number }
 type InMsg = SetupMsg | TileMsg
 
@@ -27,13 +28,15 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
     curWorldKey = msg.worldKey
     highlight = msg.highlight
     terrain = msg.terrain
+    layerY = msg.layerY
     ;(self as unknown as Worker).postMessage({ type: 'ready', worldKey: msg.worldKey })
     return
   }
   if (msg.type === 'tile') {
     if (msg.worldKey !== curWorldKey || !colors) return // stale request
     const { scale, tx, tz } = msg
-    const yLayer = scale === 1 ? 63 : 15
+    // genArea's y is block-coords at scale 1, biome-coords (÷4) otherwise.
+    const yLayer = scale === 1 ? layerY : Math.floor(layerY / 4)
     let ids: Int32Array
     try { ids = genArea(scale, tx * TILE, tz * TILE, TILE, TILE, yLayer) }
     catch { return }
