@@ -115,6 +115,7 @@ export function mcAssetsPlugin(): Plugin {
         const categories = [
           'blocks', 'items', 'entity', 'painting', 'gui',
           'particle', 'environment', 'misc', 'colormap', 'mob_effect',
+          'trims', // armor trim patterns + color palettes (used by the armor-trim tool)
         ]
         for (const type of categories) {
           await copyDirRecursive(path.join(srcBase, type), path.join(dstBase, type))

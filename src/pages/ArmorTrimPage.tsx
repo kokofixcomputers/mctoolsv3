@@ -90,13 +90,15 @@ export default function ArmorTrimPage() {
     for (const slot of SLOTS) {
       const s = slots[slot]
       if (!s.material) continue
-      const baseUrl = slot === 'leggings' ? LEGGINGS[s.material] : ARMOR[s.material]
+      const baseSet = (slot === 'leggings' ? LEGGINGS : ARMOR) as Record<string, string>
+      const baseUrl = baseSet[s.material]
       if (!baseUrl) continue
       const baseCanvas = await textureCanvas(baseUrl)
       let trimCanvas: HTMLCanvasElement | null = null
       if (s.trim) {
-        const trimUrl = slot === 'leggings' ? TRIM_LEG[s.trim] : TRIM[s.trim]
-        if (trimUrl) trimCanvas = await recolorTrim(trimUrl, s.trimMaterial)
+        const trimUrl = (slot === 'leggings' ? TRIM_LEG : TRIM) as Record<string, string>
+        const trimSrc = trimUrl[s.trim]
+        if (trimSrc) trimCanvas = await recolorTrim(trimSrc, s.trimMaterial)
       }
       group.add(buildArmorSlot(slot, baseCanvas, trimCanvas))
     }
