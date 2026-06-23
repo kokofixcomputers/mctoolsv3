@@ -208,6 +208,48 @@ int mc_estimate_loot(int stype, int x, int z, char* out, int cap) {
     return len;
 }
 
+// Find ore-block positions in a chunk box using the fork's ore generation.
+// uiOre: 1=Diamond 2=AncientDebris 3=Redstone 4=Iron 5=Emerald 6=Gold 7=Lapis 8=Coal 9=Copper
+// Writes x,y,z int triples into `out`; returns the number of blocks found.
+EMSCRIPTEN_KEEPALIVE
+int mc_find_ores(int uiOre, int chunkX0, int chunkZ0, int chunkX1, int chunkZ1, int* out, int maxBlocks) {
+    // Each UI ore maps to ALL of its 1.18+ ore-gen configs (small/middle/large/
+    // buried/lower variants), which are unioned — otherwise ores like iron/coal,
+    // whose primary blob is split across configs, would yield nothing.
+    int types[6]; int nt = 0;
+    switch (uiOre) {
+        case 1: types[nt++]=DiamondOre; types[nt++]=BuriedDiamondOre; types[nt++]=LargeDiamondOre; types[nt++]=MediumDiamondOre; break;
+        case 2: types[nt++]=LargeDebrisOre; types[nt++]=SmallDebrisOre; break;
+        case 3: types[nt++]=RedstoneOre; types[nt++]=LowerRedstoneOre; break;
+        case 4: types[nt++]=IronOre; types[nt++]=MiddleIronOre; types[nt++]=SmallIronOre; break;
+        case 5: types[nt++]=EmeraldOre; break;
+        case 6: types[nt++]=GoldOre; types[nt++]=ExtraGoldOre; types[nt++]=LowerGoldOre; break;
+        case 7: types[nt++]=LapisOre; types[nt++]=BuriedLapisOre; break;
+        case 8: types[nt++]=CoalOre; types[nt++]=LowerCoalOre; break;
+        case 9: types[nt++]=CopperOre; types[nt++]=LargeCopperOre; break;
+        default: return 0;
+    }
+
+    int n = 0;
+    for (int t = 0; t < nt; t++) {
+        OreConfig oconf;
+        if (!getOreConfig(types[t], g_mc, -1, &oconf)) continue;
+        for (int cz = chunkZ0; cz <= chunkZ1 && n < maxBlocks; cz++) {
+            for (int cx = chunkX0; cx <= chunkX1 && n < maxBlocks; cx++) {
+                Pos3List list = generateOres(&g, &g_sn, oconf, cx, cz);
+                for (int i = 0; i < list.size && n < maxBlocks; i++) {
+                    out[n * 3 + 0] = list.pos3s[i].x;
+                    out[n * 3 + 1] = list.pos3s[i].y;
+                    out[n * 3 + 2] = list.pos3s[i].z;
+                    n++;
+                }
+                freePos3List(&list);
+            }
+        }
+    }
+    return n;
+}
+
 // Allocate / free scratch buffers for JS.
 EMSCRIPTEN_KEEPALIVE void* mc_malloc(int n) { return malloc(n); }
 EMSCRIPTEN_KEEPALIVE void mc_free(void* p) { free(p); }

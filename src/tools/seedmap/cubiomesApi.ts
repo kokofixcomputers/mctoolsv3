@@ -8,8 +8,9 @@ let ready: Promise<void> | null = null
 
 // cwrapped functions
 let _setup: any, _apply: any, _biomeAt: any, _genArea: any, _genHeights: any, _findStructures: any
-let _findStrongholds: any, _getSpawn: any, _villageAbandoned: any, _estimateLoot: any
+let _findStrongholds: any, _getSpawn: any, _villageAbandoned: any, _estimateLoot: any, _findOres: any
 let lootPtr = 0, lootCap = 0
+let orePtr = 0, oreCap = 0
 let namePtr = 0, colorPtr = 0
 let areaPtr = 0, areaCap = 0
 let heightPtr = 0, heightCap = 0
@@ -38,6 +39,7 @@ async function ensure(): Promise<void> {
     _getSpawn = mod.cwrap('mc_get_spawn', null, ['number'])
     _villageAbandoned = mod.cwrap('mc_village_abandoned', 'number', ['number', 'number'])
     _estimateLoot = mod.cwrap('mc_estimate_loot', 'number', ['number', 'number', 'number', 'number', 'number'])
+    _findOres = mod.cwrap('mc_find_ores', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number'])
 
     namePtr = mod._mc_malloc(64)
     colorPtr = mod._mc_malloc(256 * 3)
@@ -181,6 +183,21 @@ export function findStrongholds(max = 40): FoundStructure[] {
 export function getSpawn(): FoundStructure {
   _getSpawn(spawnPtr)
   return { x: mod.HEAP32[spawnPtr >> 2], z: mod.HEAP32[(spawnPtr >> 2) + 1] }
+}
+
+/**
+ * Ore block positions (x,y,z triples) within a chunk box, via the fork's ore-gen.
+ * uiOre: 1=Diamond 2=AncientDebris 3=Redstone 4=Iron 5=Emerald 6=Gold 7=Lapis 8=Coal 9=Copper
+ */
+export function findOres(uiOre: number, cx0: number, cz0: number, cx1: number, cz1: number, max = 300000): Int32Array {
+  const need = max * 3 * 4
+  if (need > oreCap) {
+    if (orePtr) mod._mc_free(orePtr)
+    orePtr = mod._mc_malloc(need)
+    oreCap = need
+  }
+  const n = _findOres(uiOre, cx0, cz0, cx1, cz1, orePtr, max)
+  return mod.HEAP32.slice(orePtr >> 2, (orePtr >> 2) + n * 3)
 }
 
 /** Whether the village at a block position is an abandoned (zombie) village. */

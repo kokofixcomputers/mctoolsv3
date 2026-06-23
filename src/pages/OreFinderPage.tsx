@@ -15,7 +15,7 @@ type Engine = 'stable' | 'beta'
 
 const ENGINES: { id: Engine; label: string; desc: string; icon: typeof Shield }[] = [
   { id: 'stable', label: 'Stable',  desc: 'Battle-tested, 3rd-party WASM engine', icon: Shield },
-  { id: 'beta',   label: 'Beta',    desc: 'Custom Rust/WASM engine with native MC ore-gen simulation', icon: FlaskConical },
+  { id: 'beta',   label: 'Beta',    desc: "cubiomes fork's native ore generation, clustered into veins", icon: FlaskConical },
 ]
 
 function CopyTpBtn({ cluster }: { cluster: Cluster }) {
@@ -131,8 +131,8 @@ export default function OreFinderPage() {
                 style={{ backgroundColor: 'rgb(var(--accent) / 0.06)', border: '1px solid rgb(var(--accent) / 0.2)', color: 'rgb(var(--muted))' }}>
                 <FlaskConical className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: 'rgb(var(--accent))' }} />
                 <span>
-                  Custom Rust engine compiled to WebAssembly. Implements Minecraft 1.18+ ore blob placement
-                  with Xoroshiro128++ RNG and per-chunk seeding. Version and edition selectors are not used in Beta mode.
+                  Powered by the <span className="font-mono">cubiomes</span> fork's native ore generation — the same
+                  per-chunk seeding the game uses, clustered into veins. Java 1.21.11; version and edition selectors are not used in Beta mode.
                 </span>
               </div>
             )}
@@ -264,7 +264,7 @@ export default function OreFinderPage() {
                 <FlaskConical className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: 'rgb(var(--accent))' }} />
                 <div>
                   <span className="font-medium" style={{ color: 'rgb(var(--text))' }}>Beta</span>
-                  <span> — custom Rust/WASM, implements MC ore blob algorithm with Xoroshiro RNG</span>
+                  <span> — Xpple's Cubiomes fork's Implementation. Faster.</span>
                 </div>
               </div>
             </div>

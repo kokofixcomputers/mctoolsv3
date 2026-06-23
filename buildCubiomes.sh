@@ -45,13 +45,13 @@ echo "Using $(emcc --version | head -1)"
 
 # ── Compile ──────────────────────────────────────────────────────────────────
 # Keep EXPORTED_FUNCTIONS in sync with wrapper.c's EMSCRIPTEN_KEEPALIVE functions.
-EXPORTS='_mc_setup,_mc_apply,_mc_biome_at,_mc_gen_area,_mc_gen_heights,_mc_biome_colors,_mc_biome_name,_mc_find_structures,_mc_get_spawn,_mc_find_strongholds,_mc_village_abandoned,_mc_estimate_loot,_mc_malloc,_mc_free,_malloc,_free'
+EXPORTS='_mc_setup,_mc_apply,_mc_biome_at,_mc_gen_area,_mc_gen_heights,_mc_biome_colors,_mc_biome_name,_mc_find_structures,_mc_get_spawn,_mc_find_strongholds,_mc_village_abandoned,_mc_estimate_loot,_mc_find_ores,_mc_malloc,_mc_free,_malloc,_free'
 
 cd "$SRC"
 # Compile the whole vendored tree (cubiomes core + features/ + loot/ + our wrapper).
 # Exclude tests.c (it defines main() and is test-only) — the upstream subtree mirror
 # includes it, but we don't compile it into the WASM module.
-SOURCES=$(find . -name '*.c' ! -name 'tests.c' | sort | tr '\n' ' ')
+SOURCES=$(find . -name '*.c' ! -name 'tests.c' ! -path './.upstream-base/*' | sort | tr '\n' ' ')
 emcc -O3 -fwrapv \
   $SOURCES \
   -I. \
