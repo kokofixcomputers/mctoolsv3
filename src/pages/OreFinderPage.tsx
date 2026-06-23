@@ -3,6 +3,7 @@ import { Copy, Check, AlertTriangle, FlaskConical, Shield } from 'lucide-react'
 import { ORE_TYPES } from '../tools/ore_finder/finder'
 
 const VERSIONS = ['1.21.8','1.21.7','1.21.6','1.21.5','1.21.4','1.21.2','1.21','1.20','1.19','1.18']
+const SOFT_CAP = 5000 // recommended max; higher is allowed but warned
 
 interface Cluster { x: number; y: number; z: number; ores: number }
 interface Result {
@@ -43,6 +44,10 @@ export default function OreFinderPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
   const [error, setError] = useState('')
+  const [sortBy, setSortBy] = useState<'near' | 'far' | 'most' | 'fewest'>('near')
+  const [cap, setCap] = useState('200')
+  // which engine produced the current result (so display rules don't change when toggling)
+  const [resultEngine, setResultEngine] = useState<Engine>('stable')
 
   async function handleFind() {
     if (!seed.trim()) { setError('Please enter a seed'); return }
@@ -65,6 +70,7 @@ export default function OreFinderPage() {
         const res = await findOres(seed.trim(), parseInt(x)||0, parseInt(z)||0, parseInt(radius)||5, oreType, edition, version)
         setResult(res as any)
       }
+      setResultEngine(engine)
     } catch (e) { setError(e instanceof Error ? e.message : 'Failed — check WASM files') }
     setLoading(false)
   }
@@ -72,6 +78,23 @@ export default function OreFinderPage() {
   const centerX = result?.search_center?.x ?? result?.center_x
   const centerZ = result?.search_center?.z ?? result?.center_z
   const searchRadius = result?.search_radius ?? result?.radius
+
+  // sort (both engines) + cap (Beta only) for display
+  const displayClusters = (() => {
+    if (!result) return []
+    const cx = centerX ?? 0, cz = centerZ ?? 0
+    const dist = (c: Cluster) => (c.x - cx) ** 2 + (c.z - cz) ** 2
+    const arr = [...result.clusters]
+    if (sortBy === 'near') arr.sort((a, b) => dist(a) - dist(b))
+    else if (sortBy === 'far') arr.sort((a, b) => dist(b) - dist(a))
+    else if (sortBy === 'most') arr.sort((a, b) => b.ores - a.ores)
+    else arr.sort((a, b) => a.ores - b.ores)
+    if (resultEngine === 'beta') {
+      const n = Math.max(1, parseInt(cap) || 200)
+      return arr.slice(0, n)
+    }
+    return arr
+  })()
 
   return (
     <div className="section container">
@@ -203,8 +226,35 @@ export default function OreFinderPage() {
                   </div>
                 </div>
               </div>
+              {/* Sort + cap controls */}
+              <div className="flex flex-wrap items-end gap-3 mb-4">
+                <div>
+                  <label className="form-label">Sort by</label>
+                  <select className="form-input text-sm !py-2" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+                    <option value="near">Closest first</option>
+                    <option value="far">Farthest first</option>
+                    <option value="most">Most ores</option>
+                    <option value="fewest">Fewest ores</option>
+                  </select>
+                </div>
+                {resultEngine === 'beta' && (
+                  <div>
+                    <label className="form-label">Max results</label>
+                    <input type="number" min={1} className="form-input text-sm !py-2 w-28" value={cap} onChange={(e) => setCap(e.target.value)} />
+                  </div>
+                )}
+                <span className="text-xs pb-2.5" style={{ color: 'rgb(var(--muted))' }}>
+                  Showing {displayClusters.length} of {result.clusters_found}
+                </span>
+              </div>
+              {resultEngine === 'beta' && (parseInt(cap) || 0) > SOFT_CAP && (
+                <div className="alert-danger mb-4" style={{ backgroundColor: 'rgb(var(--warning) / 0.08)', color: 'rgb(var(--warning))', borderColor: 'rgb(var(--warning) / 0.25)' }}>
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>Caps above {SOFT_CAP.toLocaleString()} are applied, but rendering that many rows can make the page sluggish.</span>
+                </div>
+              )}
               <div className="space-y-2 max-h-[460px] overflow-y-auto">
-                {result.clusters.map((c, i) => (
+                {displayClusters.map((c, i) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded-xl transition-all"
                     style={{ backgroundColor: 'rgb(var(--bg))', border: '1px solid rgb(var(--border))' }}
                     onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgb(var(--accent) / 0.4)')}

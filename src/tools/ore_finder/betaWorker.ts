@@ -11,8 +11,8 @@ type BetaResponse = { id: number; ok: boolean; result?: unknown; error?: string 
 const ws = self as unknown as DedicatedWorkerGlobalScope
 
 const BETA_VERSION = '1.21.11'
-const MAX_RADIUS = 24      // chunk radius cap
-const MAX_CLUSTERS = 200
+const MAX_RADIUS = 24       // chunk radius cap
+const MAX_CLUSTERS = 50000  // absolute safety cap; the page applies the user-facing cap + sort
 
 interface Cluster { x: number; y: number; z: number; ores: number }
 
