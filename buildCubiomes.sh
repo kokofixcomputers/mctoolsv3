@@ -49,7 +49,9 @@ EXPORTS='_mc_setup,_mc_apply,_mc_biome_at,_mc_gen_area,_mc_gen_heights,_mc_biome
 
 cd "$SRC"
 # Compile the whole vendored tree (cubiomes core + features/ + loot/ + our wrapper).
-SOURCES=$(find . -name '*.c' | sort | tr '\n' ' ')
+# Exclude tests.c (it defines main() and is test-only) — the upstream subtree mirror
+# includes it, but we don't compile it into the WASM module.
+SOURCES=$(find . -name '*.c' ! -name 'tests.c' | sort | tr '\n' ' ')
 emcc -O3 -fwrapv \
   $SOURCES \
   -I. \
