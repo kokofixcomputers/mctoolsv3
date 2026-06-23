@@ -3,9 +3,12 @@
 #include "generator.h"
 #include "finders.h"
 #include "util.h"
+#include "loot/loot_tables.h"
+#include "loot/loot_table_context.h"
 #include <emscripten.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 static Generator g;
 static int g_mc = MC_NEWEST;
@@ -148,6 +151,61 @@ int mc_find_strongholds(int* out, int maxOut) {
         n++;
     }
     return n;
+}
+
+// Estimate the actual chest loot at a structure (deterministic from seed + chest
+// position). Writes a JSON array of chests → items into `out`. Returns bytes written.
+// Only some structures support loot (see the fork's docs). NB: loot tables from
+// init_loot_table_name are STATIC — never free them.
+static Piece g_pieces[600];
+
+EMSCRIPTEN_KEEPALIVE
+int mc_estimate_loot(int stype, int x, int z, char* out, int cap) {
+    out[0] = 0;
+    int biome = getBiomeAt(&g, 4, x >> 2, 15, z >> 2);
+
+    StructureVariant sv;
+    memset(&sv, 0, sizeof(sv));
+    getVariant(&sv, stype, g_mc, g_seed, x, z, biome);
+    int vbiome = sv.biome >= 0 ? sv.biome : biome;
+
+    StructureSaltConfig ssconf;
+    if (!getStructureSaltConfig(stype, g_mc, vbiome, &ssconf)) return 0;
+
+    int np = getStructurePieces(g_pieces, 600, stype, ssconf, &sv, g_mc, g_seed, x, z);
+    if (np <= 0) return 0;
+
+    int len = 0;
+    len += snprintf(out + len, cap - len, "[");
+    int firstChest = 1;
+    for (int p = 0; p < np && len < cap - 80; p++) {
+        for (int c = 0; c < g_pieces[p].chestCount && len < cap - 80; c++) {
+            LootTableContext* ctx = NULL;
+            if (!init_loot_table_name(&ctx, g_pieces[p].lootTables[c], g_mc) || !ctx)
+                continue;
+            // Tables with unresolved sub-tables (e.g. 1.20+ archaeology) would call a
+            // null function in generate_loot — skip them. Never free (tables are static).
+            if (ctx->unresolved_subtable_count > 0) continue;
+            set_loot_seed(ctx, g_pieces[p].lootSeeds[c]);
+            generate_loot(ctx);
+
+            if (!firstChest) len += snprintf(out + len, cap - len, ",");
+            firstChest = 0;
+            Pos cp = g_pieces[p].chestPoses[c];
+            len += snprintf(out + len, cap - len, "{\"x\":%d,\"y\":%d,\"z\":%d,\"items\":[",
+                            cp.x, (int)g_pieces[p].pos.y, cp.z);
+            for (int i = 0; i < ctx->generated_item_count && len < cap - 80; i++) {
+                ItemStack it = ctx->generated_items[i];
+                const char* nm = get_item_name(ctx, it.item);
+                if (!nm) nm = "unknown";
+                len += snprintf(out + len, cap - len, "%s{\"name\":\"%s\",\"count\":%d}",
+                                i ? "," : "", nm, it.count);
+            }
+            len += snprintf(out + len, cap - len, "]}");
+        }
+    }
+    len += snprintf(out + len, cap - len, "]");
+    return len;
 }
 
 // Allocate / free scratch buffers for JS.

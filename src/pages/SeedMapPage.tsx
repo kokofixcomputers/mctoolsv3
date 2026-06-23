@@ -1,9 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { Shuffle, Plus, Minus, Crosshair, Copy, Check, Loader2 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Shuffle, Plus, Minus, Crosshair, Copy, Check, Loader2, Gift, Maximize2, X, PanelLeft } from 'lucide-react'
 import {
   initCubiomes, setupWorld, applySeed, biomeColors, biomeName, biomeAt, genArea, allBiomes,
-  findStructures, findStrongholds, getSpawn, villageAbandoned, seedToParts,
-  type Dim, type SeedParts, type FoundStructure,
+  findStructures, findStrongholds, getSpawn, villageAbandoned, estimateLoot, seedToParts,
+  type Dim, type SeedParts, type FoundStructure, type LootChest,
 } from '../tools/seedmap/cubiomesApi'
 import { STRUCTURES, ZOMBIE_VILLAGE_DEF, type StructureDef } from '../tools/seedmap/structures'
 
@@ -40,12 +41,18 @@ export default function SeedMapPage() {
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [seedInput, setSeedInput] = useState('1231234')
-  const [version, setVersion] = useState('1.21.11')
+  const [searchParams] = useSearchParams()
+  const [seedInput, setSeedInput] = useState(() => searchParams.get('seed') || '1231234')
+  const [version, setVersion] = useState(() => {
+    const v = searchParams.get('v')
+    return v && VERSIONS.includes(v) ? v : '1.21.11'
+  })
   const [dim, setDim] = useState<Dim>(0)
   const [large, setLarge] = useState(false)
   const [layerY, setLayerY] = useState(63)
-  const [enabledStructs, setEnabledStructs] = useState<Set<number>>(new Set([5]))
+  const [fullscreen, setFullscreen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [enabledStructs, setEnabledStructs] = useState<Set<number>>(() => new Set(STRUCTURES.map(s => s.type)))
 
   const [highlightBiome, setHighlightBiome] = useState<number>(-1)
   const [terrain, setTerrain] = useState(false)
@@ -55,9 +62,13 @@ export default function SeedMapPage() {
   const [locateMsg, setLocateMsg] = useState<string | null>(null)
 
   const [hover, setHover] = useState<{ x: number; z: number; biome: string } | null>(null)
-  const [popup, setPopup] = useState<{ sx: number; sy: number; x: number; z: number; label: string } | null>(null)
+  const [popup, setPopup] = useState<{ sx: number; sy: number; x: number; z: number; label: string; lootType?: number } | null>(null)
 
-  const viewRef = useRef<View>({ cx: 0, cz: 0, bpp: 4 })
+  const viewRef = useRef<View>({
+    cx: Number(searchParams.get('x')) || 0,
+    cz: Number(searchParams.get('z')) || 0,
+    bpp: searchParams.has('x') ? 1 : 4, // zoom in when arriving at a specific spot
+  })
   const partsRef = useRef<SeedParts>(seedToParts('1231234'))
   const colorsRef = useRef<Uint8Array | null>(null)
   const structMarkersRef = useRef<{ def: StructureDef; pts: FoundStructure[] }[]>([])
@@ -315,7 +326,7 @@ export default function SeedMapPage() {
     if (!canvas || !wrap) return
     const resize = () => {
       canvas.width = wrap.clientWidth
-      canvas.height = Math.max(360, Math.round(wrap.clientWidth * 0.42))
+      canvas.height = fullscreen ? wrap.clientHeight : Math.max(360, Math.round(wrap.clientWidth * 0.42))
       computeStructures()
       requestRedraw()
     }
@@ -323,16 +334,44 @@ export default function SeedMapPage() {
     const ro = new ResizeObserver(resize)
     ro.observe(wrap)
     return () => ro.disconnect()
-  }, [computeStructures, requestRedraw, ready])
+  }, [computeStructures, requestRedraw, ready, fullscreen])
+
+  // Exit fullscreen with Escape.
+  useEffect(() => {
+    if (!fullscreen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
 
   // ── Interaction ─────────────────────────────────────────────────────────────────
   const dragRef = useRef<{ x: number; y: number; cx: number; cz: number } | null>(null)
   const movedRef = useRef(false)
 
   const onDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return // only left button pans / closes
     dragRef.current = { x: e.clientX, y: e.clientY, cx: viewRef.current.cx, cz: viewRef.current.cz }
     movedRef.current = false
-    setPopup(null)
+    setPopup(null) // clicking the map (outside the popup) closes it
+  }
+
+  // Build popup data for a screen position, snapping to a nearby structure marker.
+  function popupAt(mx: number, my: number) {
+    const canvas = canvasRef.current!
+    const { cx, cz, bpp } = viewRef.current
+    const wx = Math.round(cx + (mx - canvas.width / 2) * bpp)
+    const wz = Math.round(cz + (my - canvas.height / 2) * bpp)
+    let label = worldReadyRef.current ? biomeName(biomeAt1(wx, wz, layerY)) : ''
+    let px = wx, pz = wz, lootType: number | undefined, isStructure = false
+    for (const { def, pts } of structMarkersRef.current) {
+      for (const p of pts) {
+        if (Math.abs((p.x - cx) / bpp - (mx - canvas.width / 2)) < 12 &&
+            Math.abs((p.z - cz) / bpp - (my - canvas.height / 2)) < 12) {
+          label = def.label; px = p.x; pz = p.z; lootType = def.loot ? def.type : undefined; isStructure = true
+        }
+      }
+    }
+    return { sx: mx, sy: my, x: px, z: pz, label, lootType, isStructure }
   }
   const onMove = (e: React.MouseEvent) => {
     const canvas = canvasRef.current!
@@ -358,28 +397,20 @@ export default function SeedMapPage() {
     }
   }
   const onUp = (e: React.MouseEvent) => {
+    if (e.button !== 0) return
     const wasDrag = movedRef.current
     dragRef.current = null
     if (wasDrag) { computeStructures(); requestRedraw(); return }
-    // click → popup with /tp
-    const canvas = canvasRef.current!
-    const rect = canvas.getBoundingClientRect()
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top
-    const { cx, cz, bpp } = viewRef.current
-    const wx = Math.round(cx + (mx - canvas.width / 2) * bpp)
-    const wz = Math.round(cz + (my - canvas.height / 2) * bpp)
-    // snap to a nearby structure marker if close
-    let label = worldReadyRef.current ? biomeName(biomeAt1(wx, wz, layerY)) : ''
-    let px = wx, pz = wz
-    for (const { def, pts } of structMarkersRef.current) {
-      for (const p of pts) {
-        if (Math.abs((p.x - cx) / bpp - (mx - canvas.width / 2)) < 12 &&
-            Math.abs((p.z - cz) / bpp - (my - canvas.height / 2)) < 12) {
-          label = def.label; px = p.x; pz = p.z
-        }
-      }
-    }
-    setPopup({ sx: mx, sy: my, x: px, z: pz, label })
+    // Left click only opens a popup when it lands on a structure marker.
+    const rect = canvasRef.current!.getBoundingClientRect()
+    const p = popupAt(e.clientX - rect.left, e.clientY - rect.top)
+    if (p.isStructure) setPopup(p)
+  }
+  // Right click anywhere shows the biome / location popup.
+  const onContext = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const rect = canvasRef.current!.getBoundingClientRect()
+    setPopup(popupAt(e.clientX - rect.left, e.clientY - rect.top))
   }
   const onLeave = () => { dragRef.current = null; setHover(null) }
 
@@ -472,125 +503,193 @@ export default function SeedMapPage() {
     }, 20)
   }
 
+  function nearestOf(pts: FoundStructure[]): FoundStructure | null {
+    const { cx, cz } = viewRef.current
+    let best: FoundStructure | null = null, bestD = Infinity
+    for (const p of pts) { const d = (p.x - cx) ** 2 + (p.z - cz) ** 2; if (d < bestD) { bestD = d; best = p } }
+    return best
+  }
+
   function locateStructure() {
     setLocating(true); setLocateMsg(null)
     setTimeout(() => {
-      const r = findNearestStructure(locateStruct)
-      setLocating(false)
       const def = STRUCTURES.find(s => s.type === locateStruct)
+      // Strongholds are a global feature — pick nearest from the precomputed list.
+      const r = def?.mode === 'stronghold'
+        ? nearestOf(globalMarkersRef.current.stronghold)
+        : findNearestStructure(locateStruct)
+      setLocating(false)
       if (r) jumpTo(r.x, r.z, def?.label ?? 'Structure')
       else setLocateMsg('None found nearby.')
     }, 20)
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────────
-  return (
-    <div className="section container">
-      <div className="mb-6">
-        <span className="badge-muted">Tool</span>
-        <h1 className="mt-4" style={{ color: 'rgb(var(--text))' }}>Seed Map</h1>
-        <p className="mt-2 text-lg" style={{ color: 'rgb(var(--muted))' }}>
-          Explore any seed's biomes and structures, powered by <span className="font-mono">cubiomes</span>. Drag to pan,
-          scroll to zoom, hover for the biome.
-        </p>
+  // Control cards — shared between the normal layout and the fullscreen sidebar.
+  const controlsEl = (
+    <div className="card flex flex-wrap items-end gap-3">
+      <div>
+        <label className="form-label">Version</label>
+        <select className="form-input text-sm" value={version} onChange={e => setVersion(e.target.value)}>
+          {VERSIONS.map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
       </div>
-
-      {/* Controls */}
-      <div className="card flex flex-wrap items-end gap-3 mb-4">
+      <div className="flex-1 min-w-[160px]">
+        <label className="form-label">Seed</label>
+        <input className="form-input font-mono text-sm" value={seedInput} onChange={e => setSeedInput(e.target.value)} placeholder="seed (number or text)" />
+      </div>
+      <button onClick={() => setSeedInput(String(Math.floor((Math.random() - 0.5) * 2 ** 48)))}
+        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium"
+        style={{ border: '1px solid rgb(var(--border))', color: 'rgb(var(--text))' }}>
+        <Shuffle className="w-4 h-4" /> Random
+      </button>
+      <div>
+        <label className="form-label">Dimension</label>
+        <div className="flex gap-1">
+          {([[0, 'Overworld'], [-1, 'Nether'], [1, 'End']] as const).map(([d, l]) => (
+            <button key={d} onClick={() => setDim(d as Dim)}
+              className="px-2.5 py-2 rounded-lg text-xs font-medium"
+              style={{
+                border: `1px solid ${dim === d ? 'rgb(var(--accent))' : 'rgb(var(--border))'}`,
+                background: dim === d ? 'rgb(var(--accent) / 0.1)' : 'transparent',
+                color: dim === d ? 'rgb(var(--accent))' : 'rgb(var(--muted))',
+              }}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <label className="flex items-center gap-1.5 text-sm cursor-pointer pb-1.5" style={{ color: 'rgb(var(--muted))' }}>
+        <input type="checkbox" checked={large} onChange={e => setLarge(e.target.checked)} style={{ accentColor: 'rgb(var(--accent))' }} />
+        Large Biomes
+      </label>
+      <label className="flex items-center gap-1.5 text-sm cursor-pointer pb-1.5" style={{ color: 'rgb(var(--muted))' }} title="Hill-shade by approximate surface height (best zoomed in)">
+        <input type="checkbox" checked={terrain} onChange={e => setTerrain(e.target.checked)} style={{ accentColor: 'rgb(var(--accent))' }} />
+        Terrain
+      </label>
+      {dim === 0 && (
         <div>
-          <label className="form-label">Version</label>
-          <select className="form-input text-sm" value={version} onChange={e => setVersion(e.target.value)}>
-            {VERSIONS.map(v => <option key={v} value={v}>{v}</option>)}
+          <label className="form-label">Layer</label>
+          <select className="form-input text-sm" value={layerY} onChange={e => setLayerY(Number(e.target.value))} title="Cave biomes (sulfur caves, lush, deep dark) only appear underground">
+            {LAYERS.map(l => <option key={l.y} value={l.y}>{l.label}</option>)}
           </select>
         </div>
-        <div className="flex-1 min-w-[160px]">
-          <label className="form-label">Seed</label>
-          <input className="form-input font-mono text-sm" value={seedInput} onChange={e => setSeedInput(e.target.value)} placeholder="seed (number or text)" />
-        </div>
-        <button onClick={() => setSeedInput(String(Math.floor((Math.random() - 0.5) * 2 ** 48)))}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium"
-          style={{ border: '1px solid rgb(var(--border))', color: 'rgb(var(--text))' }}>
-          <Shuffle className="w-4 h-4" /> Random
-        </button>
+      )}
+    </div>
+  )
+
+  const locateEl = (
+    <div className="card flex flex-wrap items-end gap-4">
+      <div className="flex items-end gap-2">
         <div>
-          <label className="form-label">Dimension</label>
-          <div className="flex gap-1">
-            {([[0, 'Overworld'], [-1, 'Nether'], [1, 'End']] as const).map(([d, l]) => (
-              <button key={d} onClick={() => setDim(d as Dim)}
-                className="px-2.5 py-2 rounded-lg text-xs font-medium"
-                style={{
-                  border: `1px solid ${dim === d ? 'rgb(var(--accent))' : 'rgb(var(--border))'}`,
-                  background: dim === d ? 'rgb(var(--accent) / 0.1)' : 'transparent',
-                  color: dim === d ? 'rgb(var(--accent))' : 'rgb(var(--muted))',
-                }}>{l}</button>
-            ))}
-          </div>
+          <label className="form-label flex items-center gap-1"><Crosshair className="w-3.5 h-3.5" /> Highlight biome</label>
+          <select className="form-input text-sm" value={highlightBiome} onChange={e => setHighlightBiome(Number(e.target.value))} style={{ minWidth: 160 }}>
+            <option value={-1}>— none —</option>
+            {biomeList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
         </div>
-        <label className="flex items-center gap-1.5 text-sm cursor-pointer pb-1.5" style={{ color: 'rgb(var(--muted))' }}>
-          <input type="checkbox" checked={large} onChange={e => setLarge(e.target.checked)} style={{ accentColor: 'rgb(var(--accent))' }} />
-          Large Biomes
-        </label>
-        <label className="flex items-center gap-1.5 text-sm cursor-pointer pb-1.5" style={{ color: 'rgb(var(--muted))' }} title="Hill-shade by approximate surface height (best zoomed in)">
-          <input type="checkbox" checked={terrain} onChange={e => setTerrain(e.target.checked)} style={{ accentColor: 'rgb(var(--accent))' }} />
-          Terrain
-        </label>
-        {dim === 0 && (
-          <div>
-            <label className="form-label">Layer</label>
-            <select className="form-input text-sm" value={layerY} onChange={e => setLayerY(Number(e.target.value))} title="Cave biomes (sulfur caves, lush, deep dark) only appear underground">
-              {LAYERS.map(l => <option key={l.y} value={l.y}>{l.label}</option>)}
-            </select>
-          </div>
-        )}
+        <button onClick={locateBiome} disabled={highlightBiome < 0 || locating}
+          className="px-3 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
+          style={{ border: '1px solid rgb(var(--accent))', color: 'rgb(var(--accent))' }}>
+          Find nearest
+        </button>
       </div>
+      <div className="flex items-end gap-2">
+        <div>
+          <label className="form-label">Locate structure</label>
+          <select className="form-input text-sm" value={locateStruct} onChange={e => setLocateStruct(Number(e.target.value))} style={{ minWidth: 150 }}>
+            {STRUCTURES.filter(s => s.dims.includes(dim) && (s.type >= 0 || s.mode === 'stronghold')).map(s => <option key={`${s.type}-${s.label}`} value={s.type}>{s.label}</option>)}
+          </select>
+        </div>
+        <button onClick={locateStructure} disabled={locating}
+          className="px-3 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
+          style={{ border: '1px solid rgb(var(--accent))', color: 'rgb(var(--accent))' }}>
+          Find nearest
+        </button>
+      </div>
+      {locating && <span className="text-sm pb-2" style={{ color: 'rgb(var(--muted))' }}>Searching…</span>}
+      {locateMsg && <span className="text-sm pb-2" style={{ color: '#d98a1e' }}>{locateMsg}</span>}
+      {highlightBiome >= 0 && (
+        <span className="text-xs pb-2" style={{ color: 'rgb(var(--muted))' }}>Other biomes dimmed — clear to —none— to restore.</span>
+      )}
+    </div>
+  )
 
-      {/* Locate */}
-      <div className="card flex flex-wrap items-end gap-4 mb-4">
-        <div className="flex items-end gap-2">
-          <div>
-            <label className="form-label flex items-center gap-1"><Crosshair className="w-3.5 h-3.5" /> Highlight biome</label>
-            <select className="form-input text-sm" value={highlightBiome} onChange={e => setHighlightBiome(Number(e.target.value))} style={{ minWidth: 160 }}>
-              <option value={-1}>— none —</option>
-              {biomeList.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
-          <button onClick={locateBiome} disabled={highlightBiome < 0 || locating}
-            className="px-3 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
-            style={{ border: '1px solid rgb(var(--accent))', color: 'rgb(var(--accent))' }}>
-            Find nearest
+  const filtersEl = (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <h3 style={{ color: 'rgb(var(--text))' }}>Structures</h3>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setEnabledStructs(new Set(STRUCTURES.filter(s => s.dims.includes(dim)).map(s => s.type)))}
+            className="px-2.5 py-1 rounded-lg text-xs font-medium"
+            style={{ border: '1px solid rgb(var(--accent))', color: 'rgb(var(--accent))', background: 'rgb(var(--accent) / 0.08)' }}>
+            Show All
+          </button>
+          <button
+            onClick={() => setEnabledStructs(new Set())}
+            className="px-2.5 py-1 rounded-lg text-xs font-medium"
+            style={{ border: '1px solid rgb(var(--border))', color: 'rgb(var(--muted))' }}>
+            Hide All
           </button>
         </div>
-        <div className="flex items-end gap-2">
-          <div>
-            <label className="form-label">Locate structure</label>
-            <select className="form-input text-sm" value={locateStruct} onChange={e => setLocateStruct(Number(e.target.value))} style={{ minWidth: 150 }}>
-              {STRUCTURES.filter(s => s.dims.includes(dim) && s.type >= 0).map(s => <option key={`${s.type}-${s.label}`} value={s.type}>{s.label}</option>)}
-            </select>
-          </div>
-          <button onClick={locateStructure} disabled={locating}
-            className="px-3 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
-            style={{ border: '1px solid rgb(var(--accent))', color: 'rgb(var(--accent))' }}>
-            Find nearest
-          </button>
-        </div>
-        {locating && <span className="text-sm pb-2" style={{ color: 'rgb(var(--muted))' }}>Searching…</span>}
-        {locateMsg && <span className="text-sm pb-2" style={{ color: '#d98a1e' }}>{locateMsg}</span>}
-        {highlightBiome >= 0 && (
-          <span className="text-xs pb-2" style={{ color: 'rgb(var(--muted))' }}>Other biomes dimmed — clear to —none— to restore.</span>
-        )}
       </div>
+      <div className="flex flex-wrap gap-2">
+        {STRUCTURES.filter(s => s.dims.includes(dim)).map(s => {
+          const on = enabledStructs.has(s.type)
+          return (
+            <button
+              key={`${s.type}-${s.label}`}
+              onClick={() => setEnabledStructs(prev => {
+                const n = new Set(prev); if (n.has(s.type)) n.delete(s.type); else n.add(s.type); return n
+              })}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all"
+              style={{
+                border: `1px solid ${on ? 'rgb(var(--accent))' : 'rgb(var(--border))'}`,
+                background: on ? 'rgb(var(--accent) / 0.1)' : 'transparent',
+                color: on ? 'rgb(var(--accent))' : 'rgb(var(--muted))',
+              }}>
+              <img src={s.icon} alt="" width={16} height={16} style={{ imageRendering: 'pixelated' }} /> {s.label}
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-xs mt-3" style={{ color: 'rgb(var(--muted))' }}>
+        Structure positions are verified against the biome (some 1.18+ temples/mansions can still rarely false-positive on surface height, which cubiomes can't check).
+      </p>
+    </div>
+  )
 
-      {/* Map */}
-      <div ref={wrapRef} className="relative rounded-2xl overflow-hidden mb-4" style={{ border: '1px solid rgb(var(--border))', background: '#0b0b14' }}>
+  return (
+    <div className={fullscreen ? '' : 'section container'}>
+      {!fullscreen && (
+        <div className="mb-6">
+          <span className="badge-muted">Tool</span>
+          <h1 className="mt-4" style={{ color: 'rgb(var(--text))' }}>Seed Map</h1>
+          <p className="mt-2 text-lg" style={{ color: 'rgb(var(--muted))' }}>
+            Explore any seed's biomes and structures, powered by <span className="font-mono">cubiomes</span>. Drag to pan,
+            scroll to zoom, hover for the biome. Click a structure for details &amp; loot; right-click anywhere for the location.
+          </p>
+        </div>
+      )}
+
+      {!fullscreen && <div className="mb-4">{controlsEl}</div>}
+      {!fullscreen && <div className="mb-4">{locateEl}</div>}
+
+      {/* Map — fixed below the topbar in fullscreen mode */}
+      <div
+        ref={wrapRef}
+        className={fullscreen ? 'overflow-hidden' : 'relative rounded-2xl overflow-hidden mb-4'}
+        style={fullscreen
+          ? { position: 'fixed', top: '56px', left: 0, right: 0, bottom: 0, zIndex: 40, background: '#0b0b14' }
+          : { position: 'relative', border: '1px solid rgb(var(--border))', background: '#0b0b14' }}>
         <canvas
           ref={canvasRef}
-          onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onLeave}
+          onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onLeave} onContextMenu={onContext}
           style={{ display: 'block', width: '100%', cursor: dragRef.current ? 'grabbing' : 'crosshair' }}
         />
 
         {/* Cursor readout */}
         {hover && (
-          <div className="absolute top-3 right-3 px-3 py-1.5 rounded-lg text-sm backdrop-blur pointer-events-none"
+          <div className={`absolute top-3 px-3 py-1.5 rounded-lg text-sm backdrop-blur pointer-events-none ${fullscreen ? 'left-1/2 -translate-x-1/2' : 'right-3'}`}
             style={{ background: 'rgba(20,20,32,0.8)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}>
             <span className="font-medium">{hover.biome}</span>
             <span className="ml-3 font-mono text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>x {hover.x} · z {hover.z}</span>
@@ -604,10 +703,43 @@ export default function SeedMapPage() {
           <IconBtn onClick={goToSpawn}><Crosshair className="w-4 h-4" /></IconBtn>
         </div>
 
-        {/* tp popup */}
-        {popup && (
-          <TpPopup popup={popup} onClose={() => setPopup(null)} />
+        {/* Enter fullscreen */}
+        {!fullscreen && (
+          <div className="absolute top-3 left-3">
+            <IconBtn onClick={() => setFullscreen(true)}><Maximize2 className="w-4 h-4" /></IconBtn>
+          </div>
         )}
+
+        {/* Fullscreen chrome: exit + collapsible sidebar */}
+        {fullscreen && (
+          <>
+            <button onClick={() => setFullscreen(false)}
+              className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium backdrop-blur"
+              style={{ background: 'rgba(20,20,32,0.85)', border: '1px solid rgba(255,255,255,0.16)', color: '#fff' }}>
+              <X className="w-4 h-4" /> Exit
+            </button>
+
+            <button onClick={() => setSidebarOpen(o => !o)}
+              className="absolute top-3 z-10 w-9 h-9 flex items-center justify-center rounded-lg backdrop-blur transition-all"
+              style={{ left: sidebarOpen ? 372 : 12, background: 'rgba(20,20,32,0.85)', border: '1px solid rgba(255,255,255,0.16)', color: '#fff' }}
+              title={sidebarOpen ? 'Collapse panel' : 'Open panel'}>
+              <PanelLeft className="w-4 h-4" />
+            </button>
+
+            {sidebarOpen && (
+              <div className="absolute top-0 left-0 bottom-0 overflow-y-auto p-3 space-y-3"
+                style={{ width: 360, background: 'rgb(var(--bg))', borderRight: '1px solid rgb(var(--border))' }}>
+                <div className="h-9" />
+                {controlsEl}
+                {locateEl}
+                {filtersEl}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* tp / structure popup */}
+        {popup && <TpPopup popup={popup} />}
 
         {/* Loading / error */}
         {(!ready || error) && (
@@ -619,49 +751,7 @@ export default function SeedMapPage() {
         )}
       </div>
 
-      {/* Structure filters */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-3">
-          <h3 style={{ color: 'rgb(var(--text))' }}>Structures</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setEnabledStructs(new Set(STRUCTURES.filter(s => s.dims.includes(dim)).map(s => s.type)))}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium"
-              style={{ border: '1px solid rgb(var(--accent))', color: 'rgb(var(--accent))', background: 'rgb(var(--accent) / 0.08)' }}>
-              Show All
-            </button>
-            <button
-              onClick={() => setEnabledStructs(new Set())}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium"
-              style={{ border: '1px solid rgb(var(--border))', color: 'rgb(var(--muted))' }}>
-              Hide All
-            </button>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {STRUCTURES.filter(s => s.dims.includes(dim)).map(s => {
-            const on = enabledStructs.has(s.type)
-            return (
-              <button
-                key={`${s.type}-${s.label}`}
-                onClick={() => setEnabledStructs(prev => {
-                  const n = new Set(prev); if (n.has(s.type)) n.delete(s.type); else n.add(s.type); return n
-                })}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all"
-                style={{
-                  border: `1px solid ${on ? 'rgb(var(--accent))' : 'rgb(var(--border))'}`,
-                  background: on ? 'rgb(var(--accent) / 0.1)' : 'transparent',
-                  color: on ? 'rgb(var(--accent))' : 'rgb(var(--muted))',
-                }}>
-                <img src={s.icon} alt="" width={16} height={16} style={{ imageRendering: 'pixelated' }} /> {s.label}
-              </button>
-            )
-          })}
-        </div>
-        <p className="text-xs mt-3" style={{ color: 'rgb(var(--muted))' }}>
-          Structure positions are verified against the biome (some 1.18+ temples/mansions can still rarely false-positive on surface height, which cubiomes can't check).
-        </p>
-      </div>
+      {!fullscreen && filtersEl}
     </div>
   )
 }
@@ -688,14 +778,26 @@ function IconBtn({ onClick, children }: { onClick: () => void; children: React.R
   )
 }
 
-function TpPopup({ popup, onClose }: { popup: { sx: number; sy: number; x: number; z: number; label: string }; onClose: () => void }) {
+function TpPopup({ popup }: { popup: { sx: number; sy: number; x: number; z: number; label: string; lootType?: number } }) {
   const [copied, setCopied] = useState(false)
+  const [loot, setLoot] = useState<LootChest[] | null>(null)
+  const [lootLoading, setLootLoading] = useState(false)
   const cmd = `/tp @s ${popup.x} ~ ${popup.z}`
   const left = Math.min(popup.sx, 99999)
+
+  function estimate() {
+    if (popup.lootType === undefined) return
+    setLootLoading(true)
+    setTimeout(() => {
+      try { setLoot(estimateLoot(popup.lootType!, popup.x, popup.z)) }
+      catch { setLoot([]) }
+      setLootLoading(false)
+    }, 10)
+  }
+
   return (
     <div className="absolute rounded-xl p-3 backdrop-blur text-sm"
-      style={{ left, top: popup.sy, transform: 'translate(-50%, calc(-100% - 10px))', background: 'rgba(20,20,32,0.92)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', minWidth: 180 }}
-      onMouseLeave={onClose}>
+      style={{ left, top: popup.sy, transform: 'translate(-50%, calc(-100% - 10px))', background: 'rgba(20,20,32,0.92)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', minWidth: 200, maxWidth: 280 }}>
       <div className="font-semibold mb-1">{popup.label || 'Location'}</div>
       <div className="font-mono text-xs mb-2" style={{ color: 'rgba(255,255,255,0.6)' }}>x {popup.x} · z {popup.z}</div>
       <button
@@ -704,6 +806,32 @@ function TpPopup({ popup, onClose }: { popup: { sx: number; sy: number; x: numbe
         style={{ background: 'rgb(var(--accent))', color: 'rgb(var(--accent-fg,#fff))' }}>
         {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy /tp</>}
       </button>
+
+      {popup.lootType !== undefined && loot === null && (
+        <button onClick={estimate} disabled={lootLoading}
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 mt-1.5 rounded-lg text-xs font-medium"
+          style={{ border: '1px solid rgba(255,255,255,0.25)', color: '#fff' }}>
+          <Gift className="w-3.5 h-3.5" /> {lootLoading ? 'Rolling…' : 'Estimate loot'}
+        </button>
+      )}
+
+      {loot !== null && (
+        <div className="mt-2 max-h-56 overflow-auto" style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 6 }}>
+          {loot.length === 0 ? (
+            <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>No chest loot found (or contains unresolvable pools).</div>
+          ) : loot.map((chest, ci) => (
+            <div key={ci} className="mb-1.5">
+              <div className="text-[11px] font-mono mb-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Chest {loot.length > 1 ? `#${ci + 1} ` : ''}@ {chest.x} {chest.y} {chest.z}</div>
+              {chest.items.map((it, ii) => (
+                <div key={ii} className="flex justify-between text-xs">
+                  <span>{it.name.replace('minecraft:', '').replace(/_/g, ' ')}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>×{it.count}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

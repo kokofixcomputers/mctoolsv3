@@ -257,6 +257,8 @@ export default function SkinPage() {
   const rafRef = useRef<number>(0)
 
   const gridMeshesRef = useRef<THREE.LineSegments[]>([])
+  const overlayMeshesRef = useRef<THREE.Mesh[]>([])
+  const overlayGridRef = useRef<THREE.LineSegments[]>([])
   const showGridRef = useRef(false)
 
   const [tool, setTool] = useState<Tool>('brush')
@@ -265,6 +267,8 @@ export default function SkinPage() {
   const [brushSize, setBrushSize] = useState(1)
   const [hexVal, setHexVal] = useState('#cc2222')
   const [showGrid, setShowGrid] = useState(false)
+  const [showOuter, setShowOuter] = useState(true)   // second skin layer (hat/jacket/sleeves/pants)
+  const [hideInner, setHideInner] = useState(false)  // hide base so the outer layer + its grid are clear
   const [undoStack, setUndoStack] = useState<ImageData[]>([])
   const [redoStack, setRedoStack] = useState<ImageData[]>([])
   const [recentColors, setRecentColors] = useState<string[]>([])
@@ -451,6 +455,8 @@ export default function SkinPage() {
     skinTextureRef.current = tex
 
     const mat = new THREE.MeshLambertMaterial({ map: tex })
+    // outer skin layer — transparent so empty overlay pixels don't show
+    const overlayMat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.01, side: THREE.DoubleSide, depthWrite: false })
 
     // Grid line material
     const gridLineMat = new THREE.LineBasicMaterial({
@@ -538,20 +544,23 @@ export default function SkinPage() {
       px: number, py: number, pz: number,
       uvFaces: FaceUV[],
       segW: number, segH: number, segD: number,
+      overlay = false,
     ) {
-      const geo = new THREE.BoxGeometry(w, h, d)
+      const e = overlay ? 0.5 : 0 // inflate the outer layer
+      const geo = new THREE.BoxGeometry(w + e * 2, h + e * 2, d + e * 2)
       setBoxUVs(geo, uvFaces)
-      const mesh = new THREE.Mesh(geo, mat)
+      const mesh = new THREE.Mesh(geo, overlay ? overlayMat : mat)
       mesh.position.set(px, py, pz)
+      mesh.renderOrder = overlay ? 1 : 0
       scene.add(mesh)
-      meshesRef.current.push(mesh)
+      ;(overlay ? overlayMeshesRef : meshesRef).current.push(mesh)
 
-      const gridGeo = makePixelGridGeo(w, h, d, segW, segH, segD)
+      const gridGeo = makePixelGridGeo(w + e * 2, h + e * 2, d + e * 2, segW, segH, segD)
       const lines = new THREE.LineSegments(gridGeo, gridLineMat)
       lines.position.set(px, py, pz)
       lines.visible = false
       scene.add(lines)
-      gridMeshesRef.current.push(lines)
+      ;(overlay ? overlayGridRef : gridMeshesRef).current.push(lines)
     }
 
     // HEAD — 8×8×8 pixels

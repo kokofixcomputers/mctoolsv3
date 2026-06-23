@@ -8,7 +8,8 @@ let ready: Promise<void> | null = null
 
 // cwrapped functions
 let _setup: any, _apply: any, _biomeAt: any, _genArea: any, _genHeights: any, _findStructures: any
-let _findStrongholds: any, _getSpawn: any, _villageAbandoned: any
+let _findStrongholds: any, _getSpawn: any, _villageAbandoned: any, _estimateLoot: any
+let lootPtr = 0, lootCap = 0
 let namePtr = 0, colorPtr = 0
 let areaPtr = 0, areaCap = 0
 let heightPtr = 0, heightCap = 0
@@ -36,6 +37,7 @@ async function ensure(): Promise<void> {
     _findStrongholds = mod.cwrap('mc_find_strongholds', 'number', ['number', 'number'])
     _getSpawn = mod.cwrap('mc_get_spawn', null, ['number'])
     _villageAbandoned = mod.cwrap('mc_village_abandoned', 'number', ['number', 'number'])
+    _estimateLoot = mod.cwrap('mc_estimate_loot', 'number', ['number', 'number', 'number', 'number', 'number'])
 
     namePtr = mod._mc_malloc(64)
     colorPtr = mod._mc_malloc(256 * 3)
@@ -184,4 +186,19 @@ export function getSpawn(): FoundStructure {
 /** Whether the village at a block position is an abandoned (zombie) village. */
 export function villageAbandoned(x: number, z: number): boolean {
   return _villageAbandoned(x, z) === 1
+}
+
+export interface LootChest { x: number; y: number; z: number; items: { name: string; count: number }[] }
+
+/** The exact (deterministic) chest loot at a structure for the current seed/version. */
+export function estimateLoot(structType: number, x: number, z: number): LootChest[] {
+  const cap = 1 << 16
+  if (lootCap < cap) {
+    if (lootPtr) mod._mc_free(lootPtr)
+    lootPtr = mod._mc_malloc(cap)
+    lootCap = cap
+  }
+  const len = _estimateLoot(structType, x, z, lootPtr, cap)
+  if (len <= 0) return []
+  try { return JSON.parse(mod.UTF8ToString(lootPtr)) } catch { return [] }
 }

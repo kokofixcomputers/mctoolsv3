@@ -30,6 +30,9 @@ import XpCalculatorPage from './pages/XpCalculatorPage'
 import PortalCalculatorPage from './pages/PortalCalculatorPage'
 import PiglinBarterPage from './pages/PiglinBarterPage'
 import SeedMapPage from './pages/SeedMapPage'
+import SeedFinderPage from './pages/SeedFinderPage'
+import SummonPage from './pages/SummonPage'
+import ArmorTrimPage from './pages/ArmorTrimPage'
 import DatapackPage from './pages/DatapackPage'
 
 export default function App() {
@@ -67,6 +70,9 @@ export default function App() {
             <Route path="portal" element={<PortalCalculatorPage />} />
             <Route path="piglin" element={<PiglinBarterPage />} />
             <Route path="seed-map" element={<SeedMapPage />} />
+            <Route path="seed-finder" element={<SeedFinderPage />} />
+            <Route path="summon" element={<SummonPage />} />
+            <Route path="armor-trim" element={<ArmorTrimPage />} />
             <Route path="datapack" element={<DatapackPage />} />
           </Route>
         </Routes>
