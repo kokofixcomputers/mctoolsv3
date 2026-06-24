@@ -63,6 +63,15 @@ export const TOOLS: ToolDef[] = [
     badge: 'New',
   },
   {
+    id: 'cmd-convert',
+    path: '/cmd-convert',
+    title: 'Command Version Converter',
+    desc: 'Convert /give commands from old NBT tag syntax (pre-1.20.5) to the new 1.20.5+ component syntax — enchantments, potions, skulls, containers, and more.',
+    category: 'Commands',
+    tags: ['command', 'converter', 'give', 'nbt', '1.20.5', 'component', 'migration', 'upgrade'],
+    badge: 'New',
+  },
+  {
     id: 'give-item',
     path: '/give',
     title: '/give — Item',

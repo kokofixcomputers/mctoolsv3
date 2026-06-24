@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowRight, FlaskConical, Droplets } from 'lucide-react'
+import { ArrowRight, FlaskConical, Droplets, Copy, Check } from 'lucide-react'
 import {
-  POTIONS, byId, buildSteps, modifiersFor, ITEM, ASSET_BASE, pretty,
+  POTIONS, byId, buildSteps, modifiersFor, ITEM, ASSET_BASE, pretty, giveCommand,
 } from '../tools/brewing/recipes'
 
 // ── tinted potion icon (overlay liquid tinted + glass on top) ─────────────────────────
@@ -43,9 +43,14 @@ function ItemIcon({ id, size = 36 }: { id: string; size?: number }) {
 
 export default function BrewingPage() {
   const [selId, setSelId] = useState('strength')
+  const [copied, setCopied] = useState(false)
   const potion = byId(selId)!
   const steps = buildSteps(potion)
   const mods = modifiersFor(potion)
+
+  function copyGive() {
+    navigator.clipboard.writeText(giveCommand(potion)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+  }
 
   return (
     <div className="section container">
@@ -147,6 +152,21 @@ export default function BrewingPage() {
             </p>
           </div>
           )}
+
+          {/* /give command */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm" style={{ color: 'rgb(var(--text))' }}>/give command <span className="text-xs font-normal" style={{ color: 'rgb(var(--muted))' }}>(1.20.5+, OP)</span></h3>
+              <button onClick={copyGive} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all"
+                style={{ background: 'rgb(var(--accent) / 0.1)', color: 'rgb(var(--accent))' }}>
+                {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+              </button>
+            </div>
+            <pre className="text-sm font-mono break-all whitespace-pre-wrap rounded-xl px-4 py-3"
+              style={{ background: 'rgb(var(--bg))', border: '1px solid rgb(var(--border))', color: 'rgb(var(--text))' }}>
+              {giveCommand(potion)}
+            </pre>
+          </div>
         </div>
       </div>
     </div>

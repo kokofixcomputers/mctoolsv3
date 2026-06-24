@@ -36,6 +36,7 @@ import ArmorTrimPage from './pages/ArmorTrimPage'
 import BrewingPage from './pages/BrewingPage'
 import HardcoreReviverPage from './pages/HardcoreReviverPage'
 import DatapackPage from './pages/DatapackPage'
+import CmdConvertPage from './pages/CmdConvertPage'
 
 export default function App() {
   return (
@@ -78,6 +79,7 @@ export default function App() {
             <Route path="hardcore-reviver" element={<HardcoreReviverPage />} />
             <Route path="brewing" element={<BrewingPage />} />
             <Route path="datapack" element={<DatapackPage />} />
+            <Route path="cmd-convert" element={<CmdConvertPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
