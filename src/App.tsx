@@ -33,6 +33,8 @@ import SeedMapPage from './pages/SeedMapPage'
 import SeedFinderPage from './pages/SeedFinderPage'
 import SummonPage from './pages/SummonPage'
 import ArmorTrimPage from './pages/ArmorTrimPage'
+import BrewingPage from './pages/BrewingPage'
+import HardcoreReviverPage from './pages/HardcoreReviverPage'
 import DatapackPage from './pages/DatapackPage'
 
 export default function App() {
@@ -73,6 +75,8 @@ export default function App() {
             <Route path="seed-finder" element={<SeedFinderPage />} />
             <Route path="summon" element={<SummonPage />} />
             <Route path="armor-trim" element={<ArmorTrimPage />} />
+            <Route path="hardcore-reviver" element={<HardcoreReviverPage />} />
+            <Route path="brewing" element={<BrewingPage />} />
             <Route path="datapack" element={<DatapackPage />} />
           </Route>
         </Routes>
