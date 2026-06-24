@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import {
   Brush, Eraser, PaintBucket, Pipette, Hand,
-  Undo2, Redo2, Download, Upload, RotateCcw, Grid3x3,
+  Undo2, Redo2, Download, Upload, RotateCcw, Grid3x3, Layers, EyeOff,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -623,6 +623,62 @@ export default function SkinPage() {
       [28, 52, 32, 64, true],
     ], 4, 12, 4)
 
+    // ── Second skin layer (hat / jacket / sleeves / pants) ───────────────────────
+    // HAT (head overlay)
+    makePart(8, 8, 8, 0, 10, 0, [
+      [48, 8, 56, 16],
+      [32, 8, 40, 16],
+      [40, 0, 48, 8],
+      [48, 0, 56, 8],
+      [40, 8, 48, 16],
+      [56, 8, 64, 16, true],
+    ], 8, 8, 8, true)
+    // JACKET (body overlay)
+    makePart(8, 12, 4, 0, 0, 0, [
+      [28, 36, 32, 48],
+      [16, 36, 20, 48],
+      [20, 32, 28, 36],
+      [28, 32, 36, 36],
+      [20, 36, 28, 48],
+      [32, 36, 40, 48, true],
+    ], 8, 12, 4, true)
+    // RIGHT SLEEVE (right arm overlay)
+    makePart(4, 12, 4, -6, 0, 0, [
+      [48, 36, 52, 48],
+      [40, 36, 44, 48],
+      [44, 32, 48, 36],
+      [48, 32, 52, 36],
+      [44, 36, 48, 48],
+      [52, 36, 56, 48, true],
+    ], 4, 12, 4, true)
+    // LEFT SLEEVE (left arm overlay)
+    makePart(4, 12, 4, 6, 0, 0, [
+      [56, 52, 60, 64],
+      [48, 52, 52, 64],
+      [52, 48, 56, 52],
+      [56, 48, 60, 52],
+      [52, 52, 56, 64],
+      [60, 52, 64, 64, true],
+    ], 4, 12, 4, true)
+    // RIGHT PANT (right leg overlay)
+    makePart(4, 12, 4, -2, -12, 0, [
+      [8, 36, 12, 48],
+      [0, 36, 4, 48],
+      [4, 32, 8, 36],
+      [8, 32, 12, 36],
+      [4, 36, 8, 48],
+      [12, 36, 16, 48, true],
+    ], 4, 12, 4, true)
+    // LEFT PANT (left leg overlay)
+    makePart(4, 12, 4, 2, -12, 0, [
+      [8, 52, 12, 64],
+      [0, 52, 4, 64],
+      [4, 48, 8, 52],
+      [8, 48, 12, 52],
+      [4, 52, 8, 64],
+      [12, 52, 16, 64, true],
+    ], 4, 12, 4, true)
+
     // Controls — always enabled; left click reserved for painting unless hand tool
     const orb = new OrbitControls(camera, renderer.domElement)
     orb.target.set(0, 0, 0)
@@ -657,6 +713,8 @@ export default function SkinPage() {
       el.removeChild(renderer.domElement)
       meshesRef.current = []
       gridMeshesRef.current = []
+      overlayMeshesRef.current = []
+      overlayGridRef.current = []
       skinTextureRef.current = null
     }
   }, [])
@@ -673,7 +731,9 @@ export default function SkinPage() {
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(mouse, cameraRef.current!)
-      const hits = raycaster.intersectObjects(meshesRef.current)
+      // paint whichever layer is visible (overlay meshes sit in front when shown)
+      const targets = [...meshesRef.current, ...overlayMeshesRef.current].filter(m => m.visible)
+      const hits = raycaster.intersectObjects(targets)
       return hits.length > 0 ? hits[0] : null
     }
 
@@ -750,11 +810,14 @@ export default function SkinPage() {
     orb.mouseButtons.LEFT = tool === 'hand' ? THREE.MOUSE.ROTATE as any : undefined as any
   }, [tool])
 
-  // Grid visibility
+  // Layer + grid visibility
   useEffect(() => {
     showGridRef.current = showGrid
-    gridMeshesRef.current.forEach(m => { m.visible = showGrid })
-  }, [showGrid])
+    meshesRef.current.forEach(m => { m.visible = !hideInner })
+    overlayMeshesRef.current.forEach(m => { m.visible = showOuter })
+    gridMeshesRef.current.forEach(m => { m.visible = showGrid && !hideInner })
+    overlayGridRef.current.forEach(m => { m.visible = showGrid && showOuter })
+  }, [showGrid, showOuter, hideInner])
 
   // ── Import / Export ───────────────────────────────────────────────────────────
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -928,6 +991,34 @@ export default function SkinPage() {
             `}
           >
             <Grid3x3 size={17} />
+          </button>
+
+          {/* Outer skin layer toggle */}
+          <button
+            onClick={() => setShowOuter(o => !o)}
+            title="Toggle 2nd skin layer (hat / jacket / sleeves / pants)"
+            className={`
+              relative w-9 h-9 rounded-lg flex items-center justify-center transition-all
+              ${showOuter
+                ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400'
+                : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-700 dark:hover:text-gray-200'}
+            `}
+          >
+            <Layers size={17} />
+          </button>
+
+          {/* Hide inner layer (edit the outer one) */}
+          <button
+            onClick={() => setHideInner(h => !h)}
+            title="Hide base layer (paint just the outer layer)"
+            className={`
+              relative w-9 h-9 rounded-lg flex items-center justify-center transition-all
+              ${hideInner
+                ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400'
+                : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-700 dark:hover:text-gray-200'}
+            `}
+          >
+            <EyeOff size={17} />
           </button>
         </div>
 
