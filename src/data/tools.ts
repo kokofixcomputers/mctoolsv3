@@ -193,6 +193,15 @@ export const TOOLS: ToolDef[] = [
     badge: 'New',
   },
   {
+    id: 'cape',
+    path: '/cape',
+    title: 'Cape Designer',
+    desc: 'Paint a custom Minecraft cape on a 3D preview. Exports a standard 64×32 PNG compatible with capes mods and resource packs.',
+    category: 'Resource Packs',
+    tags: ['cape', 'skin', '3d', 'paint', 'texture', 'designer', '64x32', 'optifine'],
+    badge: 'New',
+  },
+  {
     id: 'skin',
     path: '/skin',
     title: 'Skin Designer',
