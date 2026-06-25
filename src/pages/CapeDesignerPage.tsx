@@ -658,14 +658,19 @@ export default function CapeDesignerPage() {
     const isElytra = activeTab === 'elytra'
     const img = new Image()
     img.onload = () => {
+      const drawFlipped = (canvas: HTMLCanvasElement) => {
+        const ctx = canvas.getContext('2d')!
+        ctx.clearRect(0,0,CW,CH)
+        ctx.save(); ctx.translate(0, CH); ctx.scale(1, -1)
+        ctx.drawImage(img, 0, 0, CW, CH)
+        ctx.restore()
+      }
       if (isElytra) {
-        const ctx = elytraCanvasRef.current.getContext('2d')!
-        ctx.clearRect(0,0,CW,CH); ctx.drawImage(img, 0, 0, CW, CH)
+        drawFlipped(elytraCanvasRef.current)
         if (elytraTextureRef.current) elytraTextureRef.current.needsUpdate = true
         updateElytra2D(); saveUndoElytra()
       } else {
-        const ctx = capeCanvasRef.current.getContext('2d')!
-        ctx.clearRect(0,0,CW,CH); ctx.drawImage(img, 0, 0, CW, CH)
+        drawFlipped(capeCanvasRef.current)
         if (capeTextureRef.current) capeTextureRef.current.needsUpdate = true
         update2D(); saveUndoCape()
       }
@@ -674,16 +679,26 @@ export default function CapeDesignerPage() {
     img.src = URL.createObjectURL(file); e.target.value = ''
   }
 
+  function flippedDataURL(src: HTMLCanvasElement): string {
+    const tmp = document.createElement('canvas')
+    tmp.width = src.width; tmp.height = src.height
+    const ctx = tmp.getContext('2d')!
+    ctx.translate(0, src.height)
+    ctx.scale(1, -1)
+    ctx.drawImage(src, 0, 0)
+    return tmp.toDataURL('image/png')
+  }
+
   function handleExport() {
     if (activeTab === 'cape') {
       const a = document.createElement('a')
       a.download = 'cape.png'
-      a.href = capeCanvasRef.current.toDataURL('image/png')
+      a.href = flippedDataURL(capeCanvasRef.current)
       a.click(); showToast('Exported as cape.png')
     } else {
       const a = document.createElement('a')
       a.download = 'elytra.png'
-      a.href = elytraCanvasRef.current.toDataURL('image/png')
+      a.href = flippedDataURL(elytraCanvasRef.current)
       a.click(); showToast('Exported as elytra.png')
     }
   }
