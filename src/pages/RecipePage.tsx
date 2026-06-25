@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Search, Loader2, AlertTriangle, ArrowRight, Flame, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useVersion } from '../contexts/VersionContext'
-import { BlockRenderer, BlockThumb, blockRawUrl, itemRawUrl, guessBlockTextures } from '../components/BlockRenderer'
+import { BlockRenderer, BlockThumb, blockRawUrl, itemRawUrl, guessBlockTextures, guessBlockModel, useBlockTextures, useIsBlock, resolveBlockSpriteUrl } from '../components/BlockRenderer'
 
 // ── Data types ────────────────────────────────────────────────────────────────
 
@@ -68,8 +68,16 @@ function ItemSprite({
       height={size}
       style={{ imageRendering: 'pixelated', display: 'block' }}
       onError={() => {
-        if (src === blockRawUrl(version, name)) {
-          setSrc(itemRawUrl(version, name))
+        const blockUrl = blockRawUrl(version, name)
+        const itemUrl = itemRawUrl(version, name)
+        if (src === blockUrl) {
+          setSrc(itemUrl)
+        } else if (src === itemUrl) {
+          // Neither block nor item sprite exists — try the models JSON primary texture
+          resolveBlockSpriteUrl(version, name).then(url => {
+            if (url) setSrc(url)
+            else setFailed(true)
+          })
         } else {
           setFailed(true)
         }
@@ -99,7 +107,7 @@ function LazySprite({ name, version, size = 20 }: { name: string; version: strin
 
   return (
     <div ref={ref} style={{ width: size, height: size, flexShrink: 0 }}>
-      {inView && <ItemSprite name={name} version={version} size={size} />}
+      {inView && <BlockThumb name={name} version={version} size={size} />}
     </div>
   )
 }
@@ -232,6 +240,7 @@ function RecipeCard({
 
 // ── Detail Panel ──────────────────────────────────────────────────────────────
 
+
 function RecipeDetail({
   resultId, recipes, items, version,
 }: {
@@ -244,7 +253,8 @@ function RecipeDetail({
   const recipe = recipes[Math.min(page, recipes.length - 1)]
   const resultName = itemName(resultId, items)
   const displayName = itemDisplay(resultId, items)
-  const textures = guessBlockTextures(version, resultName)
+  const textures = useBlockTextures(version, resultName)
+  const isBlock = useIsBlock(version, resultName)
 
   // reset page when selection changes
   useEffect(() => { setPage(0) }, [resultId])
@@ -299,16 +309,18 @@ function RecipeDetail({
           />
         </div>
 
-        {/* 3D block preview */}
-        <div className="card p-5 flex flex-col items-center gap-3">
-          <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'rgb(var(--muted))' }}>
-            3D Preview
-          </p>
-          <BlockRenderer textures={textures} size={120} style={{ borderRadius: 8 }} />
-          <p className="text-xs font-mono text-center" style={{ color: 'rgb(var(--muted))' }}>
-            {resultName}
-          </p>
-        </div>
+        {/* 3D block preview — only shown for real blocks (confirmed via models JSON) */}
+        {isBlock === true && (
+          <div className="card p-5 flex flex-col items-center gap-3">
+            <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'rgb(var(--muted))' }}>
+              3D Preview
+            </p>
+            <BlockRenderer textures={textures} model={guessBlockModel(resultName)} blockId={resultName} blockVersion={version} size={120} style={{ borderRadius: 8 }} />
+            <p className="text-xs font-mono text-center" style={{ color: 'rgb(var(--muted))' }}>
+              {resultName}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

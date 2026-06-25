@@ -81,7 +81,8 @@ export function mcAssetsPlugin(): Plugin {
           return
         }
 
-        res.setHeader('Content-Type', 'image/png')
+        const mime = filePath.endsWith('.json') ? 'application/json' : 'image/png'
+        res.setHeader('Content-Type', mime)
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
         fs.createReadStream(filePath).pipe(res)
       })
@@ -119,6 +120,13 @@ export function mcAssetsPlugin(): Plugin {
         ]
         for (const type of categories) {
           await copyDirRecursive(path.join(srcBase, type), path.join(dstBase, type))
+        }
+
+        // Block model JSON (used for texture resolution in the renderer)
+        const modelsJson = path.join(srcBase, 'blocks_models.json')
+        if (fs.existsSync(modelsJson)) {
+          await fsp.mkdir(dstBase, { recursive: true })
+          await fsp.copyFile(modelsJson, path.join(dstBase, 'blocks_models.json'))
         }
       }))
 

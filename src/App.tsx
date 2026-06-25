@@ -38,6 +38,8 @@ import HardcoreReviverPage from './pages/HardcoreReviverPage'
 import DatapackPage from './pages/DatapackPage'
 import CmdConvertPage from './pages/CmdConvertPage'
 import CapeDesignerPage from './pages/CapeDesignerPage'
+import EnchantingPage from './pages/EnchantingPage'
+import ColorMatchPage from './pages/ColorMatchPage'
 
 export default function App() {
   return (
@@ -82,6 +84,8 @@ export default function App() {
             <Route path="datapack" element={<DatapackPage />} />
             <Route path="cmd-convert" element={<CmdConvertPage />} />
             <Route path="cape" element={<CapeDesignerPage />} />
+            <Route path="enchanting" element={<EnchantingPage />} />
+            <Route path="color-match" element={<ColorMatchPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
