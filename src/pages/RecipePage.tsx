@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { Search, Loader2, AlertTriangle, ArrowRight, Flame, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { Search, Loader2, AlertTriangle, ArrowRight, Flame, ChevronLeft, ChevronRight, Upload, Package, X } from 'lucide-react'
+import JSZip from 'jszip'
 import { useVersion } from '../contexts/VersionContext'
 import { BlockRenderer, BlockThumb, blockRawUrl, itemRawUrl, guessBlockTextures, guessBlockModel, useBlockTextures, useIsBlock, resolveBlockSpriteUrl } from '../components/BlockRenderer'
 
@@ -23,6 +24,126 @@ interface McRecipe {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const RAW_BASE = 'https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc'
+
+// Synthetic IDs for items not in the vanilla dataset start here
+const CUSTOM_ID_BASE = 100_000
+let _nextCustomId = CUSTOM_ID_BASE
+
+// ── Datapack parsing ──────────────────────────────────────────────────────────
+
+type RawIngredient =
+  | { item: string; components?: unknown }
+  | { tag: string }
+  | RawIngredient[]
+
+interface RawRecipe {
+  type: string
+  pattern?: string[]
+  key?: Record<string, RawIngredient>
+  ingredients?: RawIngredient[]
+  ingredient?: RawIngredient
+  result?: { id?: string; item?: string; count?: number } | string
+  category?: string
+}
+
+function stripNs(id: string): string {
+  // "minecraft:oak_planks" → "oak_planks", "mymod:foo" kept as "mymod:foo"
+  return id.startsWith('minecraft:') ? id.slice('minecraft:'.length) : id
+}
+
+function resolveIngredient(
+  raw: RawIngredient,
+  byName: Map<string, number>,
+  customItems: Map<string, McItem>,
+): number | null {
+  if (Array.isArray(raw)) {
+    // alternatives — pick first resolvable
+    for (const r of raw) {
+      const id = resolveIngredient(r, byName, customItems)
+      if (id !== null) return id
+    }
+    return null
+  }
+  if ('tag' in raw) {
+    // Can't resolve tags without full tag data — return null (empty slot)
+    return null
+  }
+  const fullName = raw.item
+  const name = stripNs(fullName)
+  if (byName.has(name)) return byName.get(name)!
+  // Unknown item — assign a synthetic ID
+  if (!customItems.has(fullName)) {
+    const syntheticId = _nextCustomId++
+    const display = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    customItems.set(fullName, { id: syntheticId, name, displayName: display, stackSize: 64 })
+  }
+  return customItems.get(fullName)!.id
+}
+
+function parseDatapackRecipes(
+  files: Record<string, string>,
+  byName: Map<string, number>,
+): { recipes: Record<string, McRecipe[]>; items: McItem[] } {
+  const customItems = new Map<string, McItem>()
+  const recipes: Record<string, McRecipe[]> = {}
+
+  for (const [path, text] of Object.entries(files)) {
+    let raw: RawRecipe
+    try { raw = JSON.parse(text) } catch { continue }
+
+    const type = raw.type?.replace(/^minecraft:/, '')
+
+    // Resolve result item
+    let resultName: string | null = null
+    let resultCount = 1
+    if (raw.result) {
+      if (typeof raw.result === 'string') {
+        resultName = raw.result
+      } else {
+        resultName = raw.result.id ?? raw.result.item ?? null
+        resultCount = raw.result.count ?? 1
+      }
+    }
+    if (!resultName) continue
+    const resultStripped = stripNs(resultName)
+    let resultId = byName.get(resultStripped) ?? null
+    if (resultId === null) {
+      if (!customItems.has(resultName)) {
+        const syntheticId = _nextCustomId++
+        const display = resultStripped.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        customItems.set(resultName, { id: syntheticId, name: resultStripped, displayName: display, stackSize: 64 })
+      }
+      resultId = customItems.get(resultName)!.id
+    }
+
+    const key = String(resultId)
+
+    if (type === 'crafting_shaped' && raw.pattern && raw.key) {
+      const inShape: (number | null)[][] = raw.pattern.map(row =>
+        row.split('').map(ch => {
+          if (ch === ' ') return null
+          const ing = raw.key![ch]
+          if (!ing) return null
+          return resolveIngredient(ing, byName, customItems)
+        })
+      )
+      const recipe: McRecipe = { inShape, result: { id: resultId, count: resultCount } }
+      ;(recipes[key] ??= []).push(recipe)
+
+    } else if (type === 'crafting_shapeless' && raw.ingredients) {
+      const ingredients: number[] = raw.ingredients
+        .map(ing => resolveIngredient(ing, byName, customItems))
+        .filter((id): id is number => id !== null)
+      if (ingredients.length) {
+        const recipe: McRecipe = { ingredients, result: { id: resultId, count: resultCount } }
+        ;(recipes[key] ??= []).push(recipe)
+      }
+    }
+    // smelting / smithing / stonecutting etc. — skip for now
+  }
+
+  return { recipes, items: [...customItems.values()] }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -359,6 +480,11 @@ export default function RecipePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Datapack state
+  const [importedPacks, setImportedPacks] = useState<string[]>([])
+  const [importing, setImporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // UI state
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -368,6 +494,7 @@ export default function RecipePage() {
   useEffect(() => {
     setLoading(true); setError(null)
     setItems(new Map()); setRecipesMap({}); setSelectedId(null); setSearch('')
+    setImportedPacks([]); _nextCustomId = CUSTOM_ID_BASE
 
     const base = `${RAW_BASE}/${version.id}`
     Promise.all([
@@ -383,6 +510,68 @@ export default function RecipePage() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [version.id])
+
+  // Build reverse name→id map for ingredient resolution
+  const itemsByName = useMemo(() => {
+    const m = new Map<string, number>()
+    items.forEach(item => m.set(item.name, item.id))
+    return m
+  }, [items])
+
+  const handleImport = useCallback(async (files: FileList | null) => {
+    if (!files?.length) return
+    setImporting(true)
+    try {
+      for (const file of Array.from(files)) {
+        const zip = await JSZip.loadAsync(file)
+
+        // Collect all recipe JSON files from data/*/recipe(s)/*.json
+        const recipeFiles: Record<string, string> = {}
+        await Promise.all(
+          Object.entries(zip.files)
+            .filter(([p]) => /\/recipes?\/[^/]+\.json$/i.test(p) && !zip.files[p].dir)
+            .map(async ([p, f]) => {
+              recipeFiles[p] = await f.async('string')
+            })
+        )
+
+        if (!Object.keys(recipeFiles).length) continue
+
+        const { recipes: newRecipes, items: newItems } = parseDatapackRecipes(recipeFiles, itemsByName)
+
+        // Merge items
+        if (newItems.length) {
+          setItems(prev => {
+            const next = new Map(prev)
+            for (const item of newItems) next.set(item.id, item)
+            return next
+          })
+        }
+
+        // Merge recipes (append, don't overwrite existing vanilla ones)
+        setRecipesMap(prev => {
+          const next = { ...prev }
+          for (const [key, list] of Object.entries(newRecipes)) {
+            next[key] = [...(next[key] ?? []), ...list]
+          }
+          return next
+        })
+
+        setImportedPacks(p => [...p, file.name])
+      }
+    } catch (e) {
+      console.error('Datapack import failed:', e)
+    } finally {
+      setImporting(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }, [itemsByName])
+
+  const removePack = useCallback((name: string) => {
+    // Simple approach: reload vanilla data and re-import remaining packs
+    // (tracked packs are just labels; actual state reset happens on version change)
+    setImportedPacks(p => p.filter(n => n !== name))
+  }, [])
 
   // Sorted list of result IDs with display names for filtering
   const sortedIds = useMemo(() => {
@@ -408,12 +597,49 @@ export default function RecipePage() {
     <div className="section py-10">
       <div className="container">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-semibold mb-1">Recipe Viewer</h1>
-          <p className="text-sm" style={{ color: 'rgb(var(--muted))' }}>
-            All crafting recipes for Minecraft {version.label}.
-            Data from <code className="font-mono text-xs">PrismarineJS/minecraft-data</code>.
-          </p>
+        <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-semibold mb-1">Recipe Viewer</h1>
+            <p className="text-sm" style={{ color: 'rgb(var(--muted))' }}>
+              All crafting recipes for Minecraft {version.label}.
+              Data from <code className="font-mono text-xs">PrismarineJS/minecraft-data</code>.
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".zip"
+              multiple
+              className="hidden"
+              onChange={e => handleImport(e.target.files)}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing || loading}
+              className="btn flex items-center gap-2 text-sm"
+              style={{ background: 'rgb(var(--accent))', color: 'rgb(var(--accent-fg))' }}
+            >
+              {importing
+                ? <Loader2 size={14} className="animate-spin" />
+                : <Upload size={14} />}
+              Import Datapack
+            </button>
+            {importedPacks.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 justify-end max-w-xs">
+                {importedPacks.map(name => (
+                  <span key={name} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgb(var(--accent)/0.12)', color: 'rgb(var(--accent))' }}>
+                    <Package size={10} />
+                    {name}
+                    <button onClick={() => removePack(name)} className="opacity-60 hover:opacity-100">
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {loading && (
