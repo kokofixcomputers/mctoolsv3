@@ -1,8 +1,95 @@
 import { useState, useRef, useEffect } from 'react'
-import { Download, Upload, User, AlertTriangle } from 'lucide-react'
-import { generateTotemFromFile, generateTotemFromUsername, generatePackFromFile, generatePackFromUsername } from '../tools/totem/generator'
+import { Download, Upload, User, AlertTriangle, ChevronDown, Search, Check } from 'lucide-react'
+import { generateTotemFromFile, generateTotemFromUsername, generatePackFromFile, generatePackFromUsername, PACK_VERSIONS, type TotemStyle, type PackVersion } from '../tools/totem/generator'
 
 type Mode = 'username' | 'file'
+
+function PackVersionPicker({ value, onChange }: { value: PackVersion; onChange: (v: PackVersion) => void }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setQuery('') }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 50) }, [open])
+
+  const filtered = PACK_VERSIONS.filter((v) =>
+    v.label.toLowerCase().includes(query.toLowerCase()) ||
+    String(v.packFormat).includes(query)
+  )
+
+  function select(v: PackVersion) { onChange(v); setOpen(false); setQuery('') }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="form-input flex items-center justify-between gap-2 w-full text-sm cursor-pointer"
+        style={{ textAlign: 'left' }}
+      >
+        <span>Java {value.label}</span>
+        <div className="flex items-center gap-1.5 shrink-0" style={{ color: 'rgb(var(--muted))' }}>
+          <span className="text-xs font-mono">fmt {value.packFormat}</span>
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 z-50 w-full rounded-xl overflow-hidden"
+          style={{
+            backgroundColor: 'rgb(var(--panel))',
+            border: '1px solid rgb(var(--border))',
+            boxShadow: '0 16px 40px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.08)',
+          }}
+        >
+          <div className="p-2" style={{ borderBottom: '1px solid rgb(var(--border))' }}>
+            <div className="flex items-center gap-2 rounded-lg px-3 py-2"
+              style={{ backgroundColor: 'rgb(var(--bg))', border: '1px solid rgb(var(--border))' }}>
+              <Search className="w-3.5 h-3.5 shrink-0" style={{ color: 'rgb(var(--muted))' }} />
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search version or format…"
+                className="bg-transparent text-sm outline-none flex-1 min-w-0"
+                style={{ color: 'rgb(var(--text))' }}
+              />
+            </div>
+          </div>
+          <div className="py-1 max-h-52 overflow-y-auto">
+            {filtered.length === 0 && (
+              <div className="px-4 py-3 text-sm" style={{ color: 'rgb(var(--muted))' }}>No versions found</div>
+            )}
+            {filtered.map((v) => (
+              <button
+                key={v.packFormat}
+                onClick={() => select(v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors"
+                style={{ color: 'rgb(var(--text))' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgb(var(--border) / 0.4)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <span>Java {v.label}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-mono" style={{ color: 'rgb(var(--muted))' }}>fmt {v.packFormat}</span>
+                  {value.packFormat === v.packFormat && <Check className="w-3.5 h-3.5" style={{ color: 'rgb(var(--accent))' }} />}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
@@ -13,6 +100,9 @@ function downloadBlob(blob: Blob, name: string) {
 
 export default function TotemPage() {
   const [mode, setMode] = useState<Mode>('username')
+  const [style, setStyle] = useState<TotemStyle>('wavy')
+  const [roundHead, setRoundHead] = useState(false)
+  const [packVersion, setPackVersion] = useState<PackVersion>(PACK_VERSIONS[0])
   const [username, setUsername] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
@@ -30,12 +120,12 @@ export default function TotemPage() {
       let canvas: HTMLCanvasElement; let blob: Blob; let pack: Blob
       if (mode === 'username') {
         if (!username.trim()) throw new Error('Enter a username')
-        ;({ canvas, blob } = await generateTotemFromUsername(username.trim()))
-        pack = await generatePackFromUsername(username.trim())
+        ;({ canvas, blob } = await generateTotemFromUsername(username.trim(), style, roundHead))
+        pack = await generatePackFromUsername(username.trim(), style, packVersion.packFormat, roundHead)
       } else {
         if (!file) throw new Error('Select a skin file')
-        ;({ canvas, blob } = await generateTotemFromFile(file))
-        pack = await generatePackFromFile(file)
+        ;({ canvas, blob } = await generateTotemFromFile(file, style, roundHead))
+        pack = await generatePackFromFile(file, style, packVersion.packFormat, roundHead)
       }
       const preview = document.createElement('canvas')
       preview.width = 160; preview.height = 160
@@ -72,6 +162,39 @@ export default function TotemPage() {
               </button>
             </div>
 
+            <div className="space-y-3">
+              <div>
+                <label className="form-label mb-2">Style</label>
+                <div className="tab-nav w-fit">
+                  <button onClick={() => setStyle('wavy')} className={style === 'wavy' ? 'tab-active' : 'tab'}>Wavy</button>
+                  <button onClick={() => setStyle('stt')} className={style === 'stt' ? 'tab-active' : 'tab'}>STT</button>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit">
+                <div
+                  onClick={() => setRoundHead((v) => !v)}
+                  className="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0"
+                  style={{ backgroundColor: roundHead ? 'rgb(var(--accent))' : 'rgb(var(--border))' }}
+                >
+                  <div
+                    className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
+                    style={{
+                      backgroundColor: 'white',
+                      transform: roundHead ? 'translateX(1.25rem)' : 'translateX(0.125rem)',
+                    }}
+                  />
+                </div>
+                <span className="text-sm" style={{ color: 'rgb(var(--text))' }}>Round head</span>
+              </label>
+            </div>
+
+            <div>
+              <label className="form-label mb-1.5">Minecraft Version</label>
+              <PackVersionPicker value={packVersion} onChange={setPackVersion} />
+              <p className="text-xs mt-1.5" style={{ color: 'rgb(var(--muted))' }}>Sets the pack_format in pack.mcmeta.</p>
+            </div>
+
             {mode === 'username' ? (
               <div>
                 <label className="form-label">Minecraft Username</label>
@@ -96,8 +219,12 @@ export default function TotemPage() {
 
           <div className="card text-sm" style={{ color: 'rgb(var(--muted))' }}>
             <h3 className="mb-2" style={{ color: 'rgb(var(--text))' }}>About the technique</h3>
-            <p className="mb-2">Uses the <em>wavy totem</em> layering method: head, torso, hands, and legs are mapped onto the 16×16 canvas with rotation and resizing.</p>
-            <p>Supports slim (Alex) and classic (Steve) models, plus second-layer overlays.</p>
+            {style === 'wavy' ? (
+              <p>Uses the <em>wavy totem</em> layering method: head, torso, hands, and legs are mapped onto the 16×16 canvas with rotation and resizing.</p>
+            ) : (
+              <p>Uses the <em>STT</em> pattern by UnFamousSoul: individual pixel rows from each body part are sampled and composited directly onto the 16×16 canvas.</p>
+            )}
+            <p className="mt-2">Supports slim (Alex) and classic (Steve) models, plus second-layer overlays.</p>
           </div>
         </div>
 
