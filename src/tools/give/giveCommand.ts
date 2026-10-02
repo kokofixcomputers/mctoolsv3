@@ -27,8 +27,10 @@ export type FoodEffect = { id: string; amplifier: number; duration: number; prob
 export type PotionOptions = {
   target?: string
   count?: number
+  potionType?: 'potion' | 'splash_potion' | 'lingering_potion' | 'tipped_arrow'
   effects: PotionEffect[]
   customColor?: number
+  _extraComponents?: string[]
 }
 
 export type FireworkExplosion = {
@@ -86,6 +88,8 @@ export type TellrawOptions = { target?: string; components: TellrawTextComponent
 export type EquippableSlot = 'head' | 'chest' | 'legs' | 'feet' | 'mainhand' | 'offhand'
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic'
 
+export type DeathEffect = { id: string; amplifier: number; duration: number }
+
 export type GiveOptions = {
   format?: GiveFormat
   target?: string
@@ -117,12 +121,21 @@ export type GiveOptions = {
   // Equippable (modern-new only)
   equippableSlot?: EquippableSlot
   damageOnHurt?: boolean    // default true; set false to disable damage when worn
+  canBeSheared?: boolean    // equippable.can_be_sheared
 
   // Boolean toggles
   glider?: boolean          // modern-new only
   deathProtection?: boolean // modern-new only
+  deathEffects?: DeathEffect[]  // death_protection.death_effects (apply_effects on death)
+  damageType?: string           // damage_type=<id> (modern-new/latest only)
+  jukeboxSong?: string          // jukebox_playable={song:"..."} (modern-latest only)
 
   maxStackSize?: number
+}
+
+// modern-latest and modern-new share most behaviour; this covers both
+function isModernNew(fmt: GiveFormat) {
+  return fmt === 'modern-latest' || fmt === 'modern-new'
 }
 
 // ── low-level helpers ─────────────────────────────────────────────────────────
@@ -205,10 +218,20 @@ function buildAttrsOld(attrs: GiveAttributeModifier[]) {
 
 // ── enchantments ──────────────────────────────────────────────────────────────
 
+// 1.21.4 and below: minecraft:enchantments={"minecraft:mending":1}
 function buildEnchants(enchants: GiveEnchantment[]) {
   const pairs = enchants
     .filter((e) => e.id.trim() && Number(e.level) > 0)
     .map((e) => `${snbtStr(normalizeId(e.id))}:${Math.floor(Number(e.level))}`)
+  if (!pairs.length) return null
+  return `{${pairs.join(',')}}`
+}
+
+// 1.21.5+ : enchantments={mending:1} — bare key, unquoted short IDs
+function buildEnchantsLatest(enchants: GiveEnchantment[]) {
+  const pairs = enchants
+    .filter((e) => e.id.trim() && Number(e.level) > 0)
+    .map((e) => `${e.id.trim().replace(/^minecraft:/, '')}:${Math.floor(Number(e.level))}`)
   if (!pairs.length) return null
   return `{${pairs.join(',')}}`
 }
@@ -228,7 +251,7 @@ export function buildGiveCommand(opts: GiveOptions): string {
 
   // custom_name / lore / item_name plain text (only when no _extraComponents provided)
   if (!opts._extraComponents?.length && opts.customName?.trim()) {
-    const v = fmt === 'modern-new' ? compNew(opts.customName, opts.style, opts.color)
+    const v = isModernNew(fmt) ? compNew(opts.customName, opts.style, opts.color)
             : fmt === 'modern-old' ? compOld(opts.customName, opts.style, opts.color)
             : null
     if (v) c.push(`custom_name=${v}`)
@@ -236,14 +259,14 @@ export function buildGiveCommand(opts: GiveOptions): string {
 
   const loreLines = (opts.loreLines ?? []).map((l) => l.trim()).filter(Boolean)
   if (!opts._extraComponents?.length && loreLines.length) {
-    const v = fmt === 'modern-new' ? buildLoreNew(loreLines, opts.style, opts.color)
+    const v = isModernNew(fmt) ? buildLoreNew(loreLines, opts.style, opts.color)
             : fmt === 'modern-old' ? buildLoreOld(loreLines, opts.style, opts.color)
             : null
     if (v) c.push(`lore=${v}`)
   }
 
   if (!opts._extraComponents?.length && opts.itemName?.trim()) {
-    const v = fmt === 'modern-new' ? compNew(opts.itemName, opts.style, opts.color)
+    const v = isModernNew(fmt) ? compNew(opts.itemName, opts.style, opts.color)
             : fmt === 'modern-old' ? compOld(opts.itemName, opts.style, opts.color)
             : null
     if (v) c.push(`item_name=${v}`)
@@ -254,15 +277,20 @@ export function buildGiveCommand(opts: GiveOptions): string {
 
   // enchantments
   if (opts.enchantments?.length) {
-    const e = buildEnchants(opts.enchantments)
-    if (e) c.push(`minecraft:enchantments=${e}`)
+    if (fmt === 'modern-latest') {
+      const e = buildEnchantsLatest(opts.enchantments)
+      if (e) c.push(`enchantments=${e}`)
+    } else {
+      const e = buildEnchants(opts.enchantments)
+      if (e) c.push(`minecraft:enchantments=${e}`)
+    }
   }
 
   // attribute_modifiers
   const validAttrs = (opts.attributes ?? []).filter((a) => a.attribute.trim())
   if (validAttrs.length) {
     c.push(`attribute_modifiers=${
-      fmt === 'modern-new' ? buildAttrsNew(validAttrs) :
+      isModernNew(fmt) ? buildAttrsNew(validAttrs) :
       fmt === 'modern-old' ? buildAttrsOld(validAttrs) : ''
     }`)
   }
@@ -289,8 +317,8 @@ export function buildGiveCommand(opts: GiveOptions): string {
     c.push(`food={${fp.join(',')}}`)
   }
 
-  // consumable (modern-new only — 1.21.2+): holds eat time AND on-eat effects
-  if (fmt === 'modern-new') {
+  // consumable (modern-new / modern-latest — 1.21.2+): holds eat time AND on-eat effects
+  if (isModernNew(fmt)) {
     const cp: string[] = []
     if (opts.consumeSeconds !== undefined) cp.push(`consume_seconds:${opts.consumeSeconds}`)
     if (validFoodEffects.length) {
@@ -302,18 +330,41 @@ export function buildGiveCommand(opts: GiveOptions): string {
     if (cp.length) c.push(`consumable={${cp.join(',')}}`)
   }
 
-  // equippable (modern-new only)
-  if (fmt === 'modern-new' && opts.equippableSlot) {
+  // equippable (modern-new / modern-latest)
+  if (isModernNew(fmt) && opts.equippableSlot) {
     const ep: string[] = [`slot:${opts.equippableSlot}`]
     if (opts.damageOnHurt === false) ep.push('damage_on_hurt:0b')
+    if (opts.canBeSheared) ep.push('can_be_sheared:1b')
     c.push(`equippable={${ep.join(',')}}`)
   }
 
-  // glider (modern-new only)
-  if (fmt === 'modern-new' && opts.glider) c.push('glider={}')
+  // glider (modern-new / modern-latest)
+  if (isModernNew(fmt) && opts.glider) c.push('glider={}')
 
-  // death_protection (modern-new only)
-  if (fmt === 'modern-new' && opts.deathProtection) c.push('death_protection={}')
+  // death_protection (modern-new / modern-latest)
+  if (isModernNew(fmt) && opts.deathProtection) {
+    const validDeathEffects = (opts.deathEffects ?? []).filter((e) => e.id.trim())
+    if (validDeathEffects.length) {
+      const effs = validDeathEffects.map((e) =>
+        `{id:${snbtStr(normalizeId(e.id))},amplifier:${e.amplifier},duration:${e.duration}}`
+      )
+      c.push(`death_protection={death_effects:[{type:apply_effects,effects:[${effs.join(',')}]}]}`)
+    } else {
+      c.push('death_protection={}')
+    }
+  }
+
+  // jukebox_playable (modern-latest only)
+  if (fmt === 'modern-latest' && opts.jukeboxSong?.trim()) {
+    const song = opts.jukeboxSong.trim()
+    c.push(`jukebox_playable={song:${snbtStr(song.includes(':') ? song : `minecraft:${song}`)}}`)
+  }
+
+  // damage_type (modern-new / modern-latest)
+  if (isModernNew(fmt) && opts.damageType?.trim()) {
+    const dt = opts.damageType.trim()
+    c.push(`damage_type=${dt.includes(':') ? dt : `minecraft:${dt}`}`)
+  }
 
   // max_stack_size
   if (opts.maxStackSize !== undefined) c.push(`max_stack_size=${opts.maxStackSize}`)
@@ -330,18 +381,23 @@ export function buildGiveCommand(opts: GiveOptions): string {
 export function buildPotionCommand(opts: PotionOptions): string {
   const target = (opts.target ?? '@p').trim() || '@p'
   const count = typeof opts.count === 'number' && opts.count > 0 ? Math.floor(opts.count) : 1
+  const itemType = opts.potionType ?? 'potion'
 
   const effectsArr = opts.effects.map((e) => {
     const id = normalizeId(e.id.trim())
     return `{id:${snbtStr(id)},amplifier:${e.amplifier},duration:${e.duration}}`
   })
 
-  const parts: string[] = []
-  if (effectsArr.length) parts.push(`custom_effects:[${effectsArr.join(',')}]`)
-  if (opts.customColor !== undefined) parts.push(`custom_color:${opts.customColor}`)
+  const potionParts: string[] = []
+  if (effectsArr.length) potionParts.push(`custom_effects:[${effectsArr.join(',')}]`)
+  if (opts.customColor !== undefined) potionParts.push(`custom_color:${opts.customColor}`)
 
-  const compPart = parts.length ? `[potion_contents={${parts.join(',')}}]` : ''
-  return `/give ${target} potion${compPart} ${count}`
+  const allComponents: string[] = []
+  if (potionParts.length) allComponents.push(`potion_contents={${potionParts.join(',')}}`)
+  if (opts._extraComponents?.length) allComponents.push(...opts._extraComponents)
+
+  const compPart = allComponents.length ? `[${allComponents.join(',')}]` : ''
+  return `/give ${target} minecraft:${itemType}${compPart} ${count}`
 }
 
 // ── firework ──────────────────────────────────────────────────────────────────

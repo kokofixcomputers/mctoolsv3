@@ -1,4 +1,8 @@
-export type GiveFormat = 'modern-new' | 'modern-old' | 'legacy' | 'bedrock'
+// modern-latest: 1.21.5+ — enchantments={mending:1} (bare key, unquoted short IDs)
+// modern-new:    1.21.2–1.21.4 — minecraft:enchantments={"minecraft:mending":1}
+// modern-old:    1.20.5–1.21.1 — single-quoted text components, food.eat_seconds
+// legacy:        1.13–1.20.4   — NBT-style
+export type GiveFormat = 'modern-latest' | 'modern-new' | 'modern-old' | 'legacy' | 'bedrock'
 
 export interface VersionDef {
   id: string
@@ -8,12 +12,13 @@ export interface VersionDef {
 }
 
 export const VERSIONS: VersionDef[] = [
-  // Java 26.x (snapshot era)
-  { id: '26.2', label: 'Java 26.2+', edition: 'java', format: 'modern-new' },
-  { id: '26.1', label: 'Java 26.1',  edition: 'java', format: 'modern-new' },
+  // Java 26.x
+  { id: '26.3', label: 'Java 26.3',  edition: 'java', format: 'modern-latest' },
+  { id: '26.2', label: 'Java 26.2',  edition: 'java', format: 'modern-latest' },
+  { id: '26.1', label: 'Java 26.1',  edition: 'java', format: 'modern-latest' },
   // Java 1.21.x
-  { id: '1.21.11', label: 'Java 1.21.11', edition: 'java', format: 'modern-new' },
-  { id: '1.21.5',  label: 'Java 1.21.5',  edition: 'java', format: 'modern-new' },
+  { id: '1.21.11', label: 'Java 1.21.11', edition: 'java', format: 'modern-latest' },
+  { id: '1.21.5',  label: 'Java 1.21.5',  edition: 'java', format: 'modern-latest' },
   { id: '1.21.4',  label: 'Java 1.21.4',  edition: 'java', format: 'modern-new' },
   { id: '1.21.1',  label: 'Java 1.21.1',  edition: 'java', format: 'modern-old' },
   { id: '1.20.6',  label: 'Java 1.20.6',  edition: 'java', format: 'modern-old' },
@@ -30,8 +35,8 @@ export const VERSIONS: VersionDef[] = [
 
 // Map global VersionContext IDs → give format
 export const GLOBAL_VERSION_FORMAT: Record<string, GiveFormat> = {
-  '1.21.11': 'modern-new',
-  '1.21.5':  'modern-new',
+  '1.21.11': 'modern-latest',
+  '1.21.5':  'modern-latest',
   '1.21.1':  'modern-old',
 }
 

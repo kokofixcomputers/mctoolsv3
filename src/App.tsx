@@ -40,6 +40,7 @@ import CmdConvertPage from './pages/CmdConvertPage'
 import CapeDesignerPage from './pages/CapeDesignerPage'
 import EnchantingPage from './pages/EnchantingPage'
 import ColorMatchPage from './pages/ColorMatchPage'
+import TellrawPage from './pages/TellrawPage'
 
 export default function App() {
   return (
@@ -86,6 +87,7 @@ export default function App() {
             <Route path="cape" element={<CapeDesignerPage />} />
             <Route path="enchanting" element={<EnchantingPage />} />
             <Route path="color-match" element={<ColorMatchPage />} />
+            <Route path="tellraw" element={<TellrawPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

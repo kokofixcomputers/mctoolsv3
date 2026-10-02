@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, X, Copy, Check, Package, FlaskConical, Rocket, Archive, Apple } from 'lucide-react'
+import { Plus, X, Copy, Check, Package, FlaskConical, Rocket, Archive, Apple, MessageSquare } from 'lucide-react'
 import { ItemPicker, containerFilter } from '../components/ItemPicker'
 import { RichNameEditor, RichLoreEditor, type RichLine, type RichLines } from '../components/RichTextEditor'
 import { serializeNameSegs, serializeLoreSegs } from '../types/richText'
@@ -9,6 +9,7 @@ import {
   buildPotionCommand,
   buildFireworkCommand,
   buildContainerCommand,
+  buildTellrawCommand,
   type GiveAttributeModifier,
   type GiveEnchantment,
   type PotionEffect,
@@ -18,6 +19,8 @@ import {
   type EquippableSlot,
   type ItemRarity,
   type FoodEffect,
+  type DeathEffect,
+  type TellrawTextComponent,
 } from '../tools/give/giveCommand'
 import { VERSIONS, GLOBAL_VERSION_FORMAT } from '../tools/give/versions'
 import { useVersion } from '../contexts/VersionContext'
@@ -168,7 +171,7 @@ function Toggle({ label, active, onClick }: { label: string; active: boolean; on
 function ItemGenerator() {
   const { version } = useVersion()
   const fmt = GLOBAL_VERSION_FORMAT[version.id] ?? 'modern-new'
-  const isNew = fmt === 'modern-new'
+  const isNew = fmt === 'modern-new' || fmt === 'modern-latest'
 
   const [target, setTarget] = useState('@p')
   const [itemId, setItemId] = useState('diamond_chestplate')
@@ -192,13 +195,20 @@ function ItemGenerator() {
   const [enableEquip, setEnableEquip] = useState(false)
   const [equipSlot, setEquipSlot] = useState<EquippableSlot>('head')
   const [damageOnHurt, setDamageOnHurt] = useState(true)
+  const [canBeSheared, setCanBeSheared] = useState(false)
 
   // Toggles
   const [glider, setGlider] = useState(false)
   const [deathProtection, setDeathProtection] = useState(false)
+  const [deathEffects, setDeathEffects] = useState<DeathEffect[]>([])
+  const [damageType, setDamageType] = useState('')
+  const [jukeboxSong, setJukeboxSong] = useState('')
 
   const { command, error } = useMemo(() => {
-    const richFmt = (fmt === 'modern-new' || fmt === 'modern-old') ? fmt : null
+    const richFmt: 'modern-new' | 'modern-old' | null =
+      fmt === 'modern-latest' ? 'modern-new'
+      : (fmt === 'modern-new' || fmt === 'modern-old') ? fmt
+      : null
     try {
       const parts: string[] = []
 
@@ -229,8 +239,12 @@ function ItemGenerator() {
           consumeSeconds: enableConsumable ? consumeSeconds : undefined,
           equippableSlot: (isNew && enableEquip) ? equipSlot : undefined,
           damageOnHurt: (isNew && enableEquip) ? damageOnHurt : undefined,
+          canBeSheared: (isNew && enableEquip) ? canBeSheared : undefined,
           glider: isNew ? glider : undefined,
           deathProtection: isNew ? deathProtection : undefined,
+          deathEffects: (isNew && deathProtection) ? deathEffects : undefined,
+          damageType: isNew ? damageType : undefined,
+          jukeboxSong: fmt === 'modern-latest' ? jukeboxSong : undefined,
           _extraComponents: c,  // injected pre-built components
         } as any),
         error: '',
@@ -239,7 +253,7 @@ function ItemGenerator() {
   }, [fmt, target, itemId, count, customNameSegs, itemNameSegs, loreLines, rarity,
       enchantments, attributes, enableFood, nutrition, saturation, canAlwaysEat,
       enableConsumable, consumeSeconds, isNew, enableEquip, equipSlot, damageOnHurt,
-      glider, deathProtection])
+      canBeSheared, glider, deathProtection, deathEffects, damageType, jukeboxSong])
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
@@ -385,20 +399,88 @@ function ItemGenerator() {
             <div className="space-y-3">
               <Toggle label="Equippable" active={enableEquip} onClick={() => setEnableEquip((v) => !v)} />
               {enableEquip && (
-                <div className="grid grid-cols-2 gap-4 pt-1">
-                  <div>
-                    <label className="form-label">Equipment Slot</label>
-                    <select className="form-input" value={equipSlot} onChange={(e) => setEquipSlot(e.target.value as EquippableSlot)}>
-                      {EQUIP_SLOTS.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                <div className="rounded-xl p-3 space-y-3" style={{ border: '1px solid rgb(var(--border))' }}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label">Equipment Slot</label>
+                      <select className="form-input" value={equipSlot} onChange={(e) => setEquipSlot(e.target.value as EquippableSlot)}>
+                        {EQUIP_SLOTS.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <div className="flex items-end pb-1">
+                  <div className="flex flex-wrap gap-4">
                     <Toggle label="Damage on hurt" active={damageOnHurt} onClick={() => setDamageOnHurt((v) => !v)} />
+                    <Toggle label="Can be sheared" active={canBeSheared} onClick={() => setCanBeSheared((v) => !v)} />
                   </div>
                 </div>
               )}
               <Toggle label="Glider (like elytra)" active={glider} onClick={() => setGlider((v) => !v)} />
-              <Toggle label="Death Protection (totem effect)" active={deathProtection} onClick={() => setDeathProtection((v) => !v)} />
+              <div>
+                <label className="form-label">Damage Type</label>
+                <input
+                  className="form-input font-mono text-sm"
+                  value={damageType}
+                  onChange={(e) => setDamageType(e.target.value.trim())}
+                  placeholder="arrow (leave blank to omit)"
+                  list="damage-type-list"
+                />
+                <datalist id="damage-type-list">
+                  {['arrow','fireball','generic','explosion','fall','fire','magic','cactus','drowning','starve','cramming','wither','dragon_breath','dryout','freeze','lightning_bolt','mob_attack','player_attack','sonic_boom','thorns'].map((d) => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
+              </div>
+              {fmt === 'modern-latest' && (
+                <div>
+                  <label className="form-label">Jukebox Song</label>
+                  <input
+                    className="form-input font-mono text-sm"
+                    value={jukeboxSong}
+                    onChange={(e) => setJukeboxSong(e.target.value.trim())}
+                    placeholder="minecraft:pigstep or custom:my_song"
+                    list="jukebox-song-list"
+                  />
+                  <datalist id="jukebox-song-list">
+                    {['minecraft:13','minecraft:cat','minecraft:blocks','minecraft:chirp','minecraft:far','minecraft:mall','minecraft:mellohi','minecraft:stal','minecraft:strad','minecraft:ward','minecraft:11','minecraft:wait','minecraft:pigstep','minecraft:otherside','minecraft:5','minecraft:relic','minecraft:creator','minecraft:creator_music_box','minecraft:precipice','minecraft:tears','minecraft:lava_chicken','minecraft:bounce'].map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Toggle label="Death Protection (totem effect)" active={deathProtection} onClick={() => setDeathProtection((v) => !v)} />
+                {deathProtection && (
+                  <div className="rounded-xl p-3 space-y-2" style={{ border: '1px solid rgb(var(--border))' }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium" style={{ color: 'rgb(var(--muted))' }}>On-death effects (apply_effects)</span>
+                      <AddBtn onClick={() => setDeathEffects((p) => [...p, { id: 'absorption', amplifier: 6, duration: 900 }])} />
+                    </div>
+                    {deathEffects.length === 0 && (
+                      <p className="text-xs" style={{ color: 'rgb(var(--muted))' }}>No effects — outputs <code>death_protection={'{}'}</code></p>
+                    )}
+                    {deathEffects.length > 0 && (
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-xs font-medium pb-0.5" style={{ color: 'rgb(var(--muted))' }}>
+                        <span>Effect</span><span className="w-16">Amplifier</span><span className="w-24">Duration (t)</span><span />
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {deathEffects.map((ef, i) => (
+                        <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
+                          <select className="form-input text-sm" value={ef.id}
+                            onChange={(e) => setDeathEffects((p) => p.map((x, j) => j === i ? { ...x, id: e.target.value } : x))}>
+                            {EFFECTS.map((e) => <option key={e} value={e}>{e}</option>)}
+                          </select>
+                          <input type="number" min={0} className="form-input text-sm w-16" value={ef.amplifier}
+                            onChange={(e) => setDeathEffects((p) => p.map((x, j) => j === i ? { ...x, amplifier: Number(e.target.value) } : x))} />
+                          <input type="number" min={1} className="form-input text-sm w-24" value={ef.duration}
+                            onChange={(e) => setDeathEffects((p) => p.map((x, j) => j === i ? { ...x, duration: Number(e.target.value) } : x))} />
+                          <RemoveBtn onClick={() => setDeathEffects((p) => p.filter((_, j) => j !== i))} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </SectionCard>
         )}
@@ -423,8 +505,11 @@ const FOOD_PRESETS = [
 function FoodGenerator() {
   const { version } = useVersion()
   const fmt = GLOBAL_VERSION_FORMAT[version.id] ?? 'modern-new'
-  const isNew = fmt === 'modern-new'
-  const richFmt = (fmt === 'modern-new' || fmt === 'modern-old') ? fmt : null
+  const isNew = fmt === 'modern-new' || fmt === 'modern-latest'
+  const richFmt: 'modern-new' | 'modern-old' | null =
+    fmt === 'modern-latest' ? 'modern-new'
+    : (fmt === 'modern-new' || fmt === 'modern-old') ? fmt
+    : null
 
   const [target, setTarget] = useState('@p')
   const [itemId, setItemId] = useState('paper')
@@ -565,17 +650,49 @@ function FoodGenerator() {
 
 // ── Potion generator ──────────────────────────────────────────────────────────
 
+type PotionType = 'potion' | 'splash_potion' | 'lingering_potion' | 'tipped_arrow'
+const POTION_TYPES: { id: PotionType; label: string }[] = [
+  { id: 'potion',            label: 'Potion' },
+  { id: 'splash_potion',     label: 'Splash' },
+  { id: 'lingering_potion',  label: 'Lingering' },
+  { id: 'tipped_arrow',      label: 'Tipped Arrow' },
+]
+
 function PotionGenerator() {
+  const { version } = useVersion()
+  const fmt = GLOBAL_VERSION_FORMAT[version.id] ?? 'modern-new'
+  const richFmt: 'modern-new' | 'modern-old' | null =
+    fmt === 'modern-latest' ? 'modern-new'
+    : (fmt === 'modern-new' || fmt === 'modern-old') ? fmt
+    : null
+
   const [target, setTarget] = useState('@p')
   const [count, setCount] = useState(1)
+  const [potionType, setPotionType] = useState<PotionType>('potion')
   const [effects, setEffects] = useState<PotionEffect[]>([{ id: 'speed', amplifier: 0, duration: 600 }])
-  const [potionColor, setPotionColor] = useState('12079103')
+  const [potionColor, setPotionColor] = useState('')
+  const [customNameSegs, setCustomNameSegs] = useState<RichLine>([])
+  const [loreLines, setLoreLines] = useState<RichLines>([[]])
 
   const { command, error } = useMemo(() => {
     try {
-      return { command: buildPotionCommand({ target, count, effects, customColor: potionColor ? parseInt(potionColor) : undefined }), error: '' }
+      const extra: string[] = []
+      if (richFmt) {
+        const cnSegs = customNameSegs.filter(s => s.text)
+        if (cnSegs.length) extra.push(`custom_name=${serializeNameSegs(cnSegs, richFmt, true)}`)
+        const loreFiltered = loreLines.filter(l => l.some(s => s.text))
+        if (loreFiltered.length) extra.push(`lore=${serializeLoreSegs(loreFiltered, richFmt)}`)
+      }
+      return {
+        command: buildPotionCommand({
+          target, count, potionType, effects,
+          customColor: potionColor.trim() ? parseInt(potionColor) : undefined,
+          _extraComponents: extra,
+        }),
+        error: '',
+      }
     } catch (e) { return { command: '', error: e instanceof Error ? e.message : 'Error' } }
-  }, [target, count, effects, potionColor])
+  }, [target, count, potionType, effects, potionColor, richFmt, customNameSegs, loreLines])
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
@@ -591,34 +708,53 @@ function PotionGenerator() {
               <input type="number" min={1} className="form-input" value={count} onChange={(e) => setCount(Number(e.target.value))} />
             </div>
           </div>
+          <div className="mt-3">
+            <label className="form-label mb-2">Type</label>
+            <div className="tab-nav w-fit">
+              {POTION_TYPES.map(({ id, label }) => (
+                <button key={id} onClick={() => setPotionType(id)}
+                  className={potionType === id ? 'tab-active' : 'tab'}>{label}</button>
+              ))}
+            </div>
+          </div>
         </SectionCard>
 
         <SectionCard title="Effects" action={<AddBtn onClick={() => setEffects((p) => [...p, { id: 'speed', amplifier: 0, duration: 600 }])} />}>
-          <div className="grid grid-cols-4 gap-2 text-xs font-medium pb-1" style={{ color: 'rgb(var(--muted))' }}>
-            <span>Effect</span><span>Amplifier</span><span>Duration (ticks)</span><span></span>
-          </div>
+          {effects.length === 0 && <p className="text-sm" style={{ color: 'rgb(var(--muted))' }}>No effects added.</p>}
+          {effects.length > 0 && (
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-xs font-medium pb-1" style={{ color: 'rgb(var(--muted))' }}>
+              <span>Effect</span><span className="w-20">Amplifier</span><span className="w-28">Duration (ticks)</span><span />
+            </div>
+          )}
           {effects.map((e, i) => (
-            <div key={i} className="grid grid-cols-4 gap-2 items-center">
+            <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
               <select className="form-input text-sm" value={e.id}
                 onChange={(ev) => setEffects((p) => p.map((x, j) => j === i ? { ...x, id: ev.target.value } : x))}>
                 {EFFECTS.map((ef) => <option key={ef} value={ef}>{ef}</option>)}
               </select>
-              <input type="number" min={0} className="form-input text-sm" value={e.amplifier}
+              <input type="number" min={0} className="form-input text-sm w-20" value={e.amplifier}
                 onChange={(ev) => setEffects((p) => p.map((x, j) => j === i ? { ...x, amplifier: Number(ev.target.value) } : x))} />
-              <input type="number" min={1} className="form-input text-sm" value={e.duration}
+              <input type="number" min={1} className="form-input text-sm w-28" value={e.duration}
                 onChange={(ev) => setEffects((p) => p.map((x, j) => j === i ? { ...x, duration: Number(ev.target.value) } : x))} />
               <RemoveBtn onClick={() => setEffects((p) => p.filter((_, j) => j !== i))} />
             </div>
           ))}
         </SectionCard>
 
+        {richFmt && (
+          <SectionCard title="Display">
+            <RichNameEditor label="Custom Name" hint="— custom_name (italic by default)" value={customNameSegs} onChange={setCustomNameSegs} placeholder="My Potion" defaultItalic />
+            <RichLoreEditor value={loreLines} onChange={setLoreLines} />
+          </SectionCard>
+        )}
+
         <SectionCard title="Custom Color">
           <div className="flex gap-3 items-center">
             <input type="color"
-              value={`#${parseInt(potionColor || '12079103').toString(16).padStart(6, '0')}`}
+              value={potionColor.trim() ? `#${parseInt(potionColor).toString(16).padStart(6, '0')}` : '#b700ae'}
               onChange={(e) => setPotionColor(parseInt(e.target.value.slice(1), 16).toString())}
               className="h-10 w-14 rounded-lg cursor-pointer" style={{ border: '1px solid rgb(var(--border))' }} />
-            <input className="form-input flex-1" value={potionColor} onChange={(e) => setPotionColor(e.target.value)} placeholder="12079103" />
+            <input className="form-input flex-1" value={potionColor} onChange={(e) => setPotionColor(e.target.value)} placeholder="Leave blank for default" />
           </div>
         </SectionCard>
       </div>
@@ -813,7 +949,60 @@ function ContainerGenerator() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = 'item' | 'food' | 'potion' | 'firework' | 'container'
+// ── Tellraw generator ─────────────────────────────────────────────────────────
+
+function TellrawGenerator() {
+  const [target, setTarget] = useState('@a')
+  const [lines, setLines] = useState<RichLines>([[]])
+
+  const { command, error } = useMemo(() => {
+    try {
+      const components: TellrawTextComponent[] = []
+      for (let i = 0; i < lines.length; i++) {
+        if (i > 0) components.push({ text: '\n' })
+        for (const seg of lines[i]) {
+          if (!seg.text) continue
+          const comp: TellrawTextComponent = { text: seg.text }
+          if (seg.color) comp.color = seg.color
+          if (seg.bold) comp.bold = true
+          if (seg.italic) comp.italic = true
+          if (seg.underlined) comp.underlined = true
+          if (seg.strikethrough) comp.strikethrough = true
+          if (seg.obfuscated) comp.obfuscated = true
+          components.push(comp)
+        }
+      }
+      if (!components.filter(c => c.text !== '\n').length) return { command: '', error: '' }
+      return { command: buildTellrawCommand({ target, components }), error: '' }
+    } catch (e) { return { command: '', error: e instanceof Error ? e.message : 'Error' } }
+  }, [target, lines])
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 space-y-4">
+        <SectionCard title="Tellraw">
+          <div>
+            <label className="form-label">Target</label>
+            <input className="form-input" value={target} onChange={(e) => setTarget(e.target.value)} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Message">
+          <RichLoreEditor
+            value={lines}
+            onChange={setLines}
+            label="Lines"
+            addLabel="Add line"
+            linePlaceholder={(i) => `Line ${i + 1}`}
+          />
+        </SectionCard>
+      </div>
+      <div><OutputCard command={command} error={error} /></div>
+    </div>
+  )
+}
+
+type Tab = 'item' | 'food' | 'potion' | 'firework' | 'container' | 'tellraw'
 
 const TABS: { id: Tab; label: string; Icon: typeof Package }[] = [
   { id: 'item',      label: 'Item',      Icon: Package },
@@ -821,6 +1010,7 @@ const TABS: { id: Tab; label: string; Icon: typeof Package }[] = [
   { id: 'potion',    label: 'Potion',    Icon: FlaskConical },
   { id: 'firework',  label: 'Firework',  Icon: Rocket },
   { id: 'container', label: 'Container', Icon: Archive },
+  { id: 'tellraw',   label: 'Tellraw',   Icon: MessageSquare },
 ]
 
 export default function GivePage() {
@@ -873,6 +1063,7 @@ export default function GivePage() {
       {tab === 'potion'    && <PotionGenerator />}
       {tab === 'firework'  && <FireworkGenerator />}
       {tab === 'container' && <ContainerGenerator />}
+      {tab === 'tellraw'   && <TellrawGenerator />}
     </div>
   )
 }

@@ -27,6 +27,15 @@ export const TOOLS: ToolDef[] = [
     tags: ['motd', 'server', 'gradient', 'paper', 'velocity', 'simplemotd'],
   },
   {
+    id: 'tellraw',
+    path: '/tellraw',
+    title: 'Tellraw Generator',
+    desc: 'Build /tellraw chat messages with gradients, formatting, clickable links and commands, and rich hover tooltips.',
+    category: 'Text',
+    tags: ['tellraw', 'chat', 'json', 'text', 'component', 'click', 'hover', 'link', 'gradient', 'command'],
+    badge: 'New',
+  },
+  {
     id: 'color-match',
     path: '/color-match',
     title: 'Block Color Matcher',

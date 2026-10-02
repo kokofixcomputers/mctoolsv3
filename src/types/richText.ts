@@ -6,6 +6,33 @@ export interface TextSegment {
   strikethrough?: boolean
   obfuscated?: boolean
   color?: string // #rrggbb
+  /** Click / hover / insertion behaviour (used by the tellraw generator) */
+  events?: TextEvents
+}
+
+// ── text events (click / hover) ───────────────────────────────────────────────
+
+export type ClickAction = 'open_url' | 'run_command' | 'suggest_command' | 'copy_to_clipboard' | 'change_page'
+export type HoverAction = 'show_text' | 'show_item' | 'show_entity'
+
+export interface TextEvents {
+  click?: { action: ClickAction; value: string }
+  hover?:
+    | { action: 'show_text'; lines: RichLines }
+    | { action: 'show_item'; id: string; count: number }
+    | { action: 'show_entity'; id: string; uuid: string; name: RichLine }
+  /** Text inserted into chat on shift-click */
+  insertion?: string
+}
+
+export function hasEvents(ev: TextEvents | undefined): ev is TextEvents {
+  return !!ev && (!!ev.click || !!ev.hover || !!ev.insertion)
+}
+
+export function sameEvents(a: TextEvents | undefined, b: TextEvents | undefined): boolean {
+  if (a === b) return true
+  if (!hasEvents(a) || !hasEvents(b)) return !hasEvents(a) && !hasEvents(b)
+  return JSON.stringify(a) === JSON.stringify(b)
 }
 
 export type RichLine = TextSegment[]
@@ -37,7 +64,8 @@ export function toSegments(text: string, fmts: CharFmt[]): TextSegment[] {
       const g = fmts[j] ?? {}
       if (
         f.bold === g.bold && f.italic === g.italic && f.underlined === g.underlined &&
-        f.strikethrough === g.strikethrough && f.obfuscated === g.obfuscated && f.color === g.color
+        f.strikethrough === g.strikethrough && f.obfuscated === g.obfuscated && f.color === g.color &&
+        sameEvents(f.events, g.events)
       ) { j++ } else break
     }
     const seg: TextSegment = { text: text.slice(i, j) }
@@ -47,6 +75,7 @@ export function toSegments(text: string, fmts: CharFmt[]): TextSegment[] {
     if (f.strikethrough) seg.strikethrough = true
     if (f.obfuscated) seg.obfuscated = true
     if (f.color) seg.color = f.color
+    if (hasEvents(f.events)) seg.events = f.events
     segs.push(seg)
     i = j
   }
@@ -65,6 +94,7 @@ export function fromSegments(segs: TextSegment[]): { text: string; fmts: CharFmt
     if (seg.strikethrough) fmt.strikethrough = true
     if (seg.obfuscated) fmt.obfuscated = true
     if (seg.color) fmt.color = seg.color
+    if (hasEvents(seg.events)) fmt.events = seg.events
     for (let i = 0; i < seg.text.length; i++) fmts.push({ ...fmt })
   }
   return { text, fmts }
