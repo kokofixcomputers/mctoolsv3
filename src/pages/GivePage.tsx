@@ -706,7 +706,7 @@ function PotionGenerator() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="form-label">Target</label>
-              <input className="form-input" value={target} onChange={(e) => setTarget(e.target.value)} />
+              <TargetInput className="form-input" value={target} onChange={setTarget} />
             </div>
             <div>
               <label className="form-label">Count</label>
@@ -795,7 +795,7 @@ function FireworkGenerator() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="form-label">Target</label>
-              <input className="form-input" value={target} onChange={(e) => setTarget(e.target.value)} />
+              <TargetInput className="form-input" value={target} onChange={setTarget} />
             </div>
             <div>
               <label className="form-label">Count</label>
@@ -912,7 +912,7 @@ function ContainerGenerator() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="form-label">Target</label>
-              <input className="form-input" value={target} onChange={(e) => setTarget(e.target.value)} />
+              <TargetInput className="form-input" value={target} onChange={setTarget} />
             </div>
             <div>
               <label className="form-label">Count</label>
@@ -988,7 +988,7 @@ function TellrawGenerator() {
         <SectionCard title="Tellraw">
           <div>
             <label className="form-label">Target</label>
-            <input className="form-input" value={target} onChange={(e) => setTarget(e.target.value)} />
+            <TargetInput className="form-input" value={target} onChange={setTarget} />
           </div>
         </SectionCard>
 

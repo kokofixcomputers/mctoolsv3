@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { embedded, usePanel } from '../lib/panel'
 
 const SELECTORS = ['@a', '@p', '@r', '@s', '@e']
@@ -20,6 +21,8 @@ export function TargetInput({ value, onChange, className, wrapperClassName = '',
   const panel = usePanel()
   const [focused, setFocused] = useState(false)
   const [index, setIndex] = useState(0)
+  const input = useRef<HTMLInputElement>(null)
+  const [box, setBox] = useState<{ left: number; top: number; width: number } | null>(null)
 
   const suggestions = useMemo(() => {
     if (!embedded || !panel.connected) return []
@@ -32,11 +35,31 @@ export function TargetInput({ value, onChange, className, wrapperClassName = '',
     setIndex(0)
   }
   const open = focused && suggestions.length > 0
+
+  // The cards around the inputs each form their own stacking context, so a list inside one would slide under the next
+  // card. It is drawn on the body instead and follows the input.
+  const place = () => {
+    const rect = input.current?.getBoundingClientRect()
+    if (rect) setBox({ left: rect.left, top: rect.bottom + 4, width: rect.width })
+  }
+  useLayoutEffect(() => {
+    if (open) place()
+  }, [open, value])
+  useEffect(() => {
+    if (!open) return
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [open])
   const current = Math.min(index, Math.max(suggestions.length - 1, 0))
 
   return (
     <div className={`relative ${wrapperClassName}`}>
       <input
+        ref={input}
         className={className}
         value={value}
         placeholder={placeholder}
@@ -61,10 +84,13 @@ export function TargetInput({ value, onChange, className, wrapperClassName = '',
         autoComplete="off"
         spellCheck={false}
       />
-      {open && (
+      {open && box && createPortal(
         <ul
-          className="absolute left-0 top-full z-50 mt-1 min-w-full w-max max-h-56 overflow-auto rounded-lg py-1 text-sm font-mono"
+          className="fixed z-[1000] w-max max-h-56 overflow-auto rounded-lg py-1 text-sm font-mono"
           style={{
+            left: box.left,
+            top: box.top,
+            minWidth: box.width,
             backgroundColor: 'rgb(var(--panel))',
             border: '1px solid rgb(var(--border))',
             boxShadow: '0 12px 30px rgba(0,0,0,.14)',
@@ -91,7 +117,8 @@ export function TargetInput({ value, onChange, className, wrapperClassName = '',
               </span>
             </li>
           ))}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   )
