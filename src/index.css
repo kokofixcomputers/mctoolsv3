@@ -6,6 +6,7 @@
 
 /* ── Design tokens ──────────────────────────────────── */
 :root {
+  --topbar: 57px;
   --bg:     248 248 250;
   --text:   15  15  20;
   --muted:  100 100 115;
@@ -263,3 +264,8 @@ input[type='range'] { accent-color: rgb(var(--accent)); }
 }
 .range-thumb::-webkit-slider-runnable-track { background: transparent; }
 .range-thumb::-moz-range-track { background: transparent; }
+
+/* ── Inside the StratPanel iframe: look like part of the page ───────── */
+html.embedded { --topbar: 44px; }
+html.embedded body { background: transparent; }
+html.embedded .section { padding-top: 1rem; padding-bottom: 2rem; padding-left: 0; padding-right: 0; }

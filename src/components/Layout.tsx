@@ -1,5 +1,5 @@
-import { Outlet, NavLink, Link } from 'react-router-dom'
-import { Pickaxe, Sun, Moon } from 'lucide-react'
+import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
+import { ArrowLeft, Pickaxe, Sun, Moon } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { VersionPicker } from './VersionPicker'
 import { embedded } from '../lib/panel'
@@ -15,6 +15,29 @@ const NAV_ITEMS = [
   { to: '/nbt',        label: 'NBT Editor' },
 ]
 
+/** The slim bar in the panel: the way back to the list of tools and the Minecraft version. */
+function EmbedBar() {
+  const { pathname } = useLocation()
+
+  return (
+    <div className="flex items-center justify-between gap-3 h-11">
+      {pathname !== '/tools' ? (
+        <Link
+          to="/tools"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[rgb(var(--border)/0.5)]"
+          style={{ color: 'rgb(var(--text))' }}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          All tools
+        </Link>
+      ) : (
+        <span />
+      )}
+      <VersionPicker />
+    </div>
+  )
+}
+
 export default function Layout() {
   const [dark, setDark] = useState(() =>
     typeof window !== 'undefined'
@@ -29,8 +52,8 @@ export default function Layout() {
   }, [dark])
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'rgb(var(--bg))' }}>
-      <header className="navbar-float">
+    <div className="min-h-screen" style={{ backgroundColor: embedded ? 'transparent' : 'rgb(var(--bg))' }}>
+      {embedded ? <EmbedBar /> : <header className="navbar-float">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
           {/* Logo */}
           <Link to={embedded ? '/tools' : '/'} className="flex items-center gap-2.5 font-semibold tracking-tight shrink-0">
@@ -73,9 +96,9 @@ export default function Layout() {
             </button>
           </div>
         </div>
-      </header>
+      </header>}
 
-      <main className="pt-14">
+      <main className={embedded ? '' : 'pt-14'}>
         <Outlet />
       </main>
 

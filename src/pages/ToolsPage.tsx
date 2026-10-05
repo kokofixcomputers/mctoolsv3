@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, ArrowRight, Palette, Radio, Gift, Gem, Wand2, Sparkles } from 'lucide-react'
 import { TOOLS, CATEGORIES, type ToolDef } from '../data/tools'
+import { embedded } from '../lib/panel'
 
 const ICON_MAP: Record<string, typeof Palette> = {
   'gradient':       Palette,
@@ -59,7 +60,7 @@ export default function ToolsPage() {
   return (
     <div className="section container">
       {/* Header */}
-      <div className="mb-10">
+      <div className="mb-10" hidden={embedded}>
         <span className="badge-muted">MCTools</span>
         <h1 className="mt-4" style={{ color: 'rgb(var(--text))' }}>All Tools</h1>
         <p className="mt-2 text-lg" style={{ color: 'rgb(var(--muted))' }}>

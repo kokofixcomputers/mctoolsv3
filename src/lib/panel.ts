@@ -44,6 +44,8 @@ function post(message: Record<string, unknown>) {
 }
 
 if (embedded) {
+  // Lets the stylesheet drop the chrome that only makes sense for the standalone site.
+  document.documentElement.classList.add('embedded')
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin || event.source !== window.parent) return
     const data = event.data

@@ -741,7 +741,7 @@ export default function CapeDesignerPage() {
   const activeRegions = activeTab === 'cape' ? CAPE_REGIONS : ELYTRA_REGIONS
 
   return (
-    <div className="flex flex-col" style={{ height:'calc(100vh - 57px)' }}>
+    <div className="flex flex-col" style={{ height:'calc(100vh - var(--topbar))' }}>
 
       {/* ── Top bar ── */}
       <div className="flex items-center gap-2 px-4 flex-shrink-0 border-b" style={{ height:48, borderColor:'rgb(var(--border))', background:'rgb(var(--panel))' }}>
