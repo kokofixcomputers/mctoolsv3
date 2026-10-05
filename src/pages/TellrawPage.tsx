@@ -5,6 +5,7 @@ import { RichLineEditor } from '../components/RichTextEditor'
 import { segmentStyle, type RichLine, type TextEvents, type TextSegment } from '../types/richText'
 import { useVersion } from '../contexts/VersionContext'
 import { buildTellraw, tellrawFormatFor } from '../tools/tellraw/tellraw'
+import { RunBtn } from '../components/RunBtn'
 
 function uid() { return Math.random().toString(36).slice(2) }
 
@@ -283,6 +284,7 @@ export default function TellrawPage() {
                   <input type="checkbox" checked={showJson} onChange={e => setShowJson(e.target.checked)} className="accent-violet-600" />
                   Component only
                 </label>
+                <RunBtn text={output} />
                 <CopyBtn text={output} />
               </div>
             </div>

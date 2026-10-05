@@ -1,4 +1,5 @@
 import type { Dim } from './cubiomesApi'
+import { asset } from '../../lib/base'
 
 export interface StructureDef {
   type: number      // cubiomes StructureType enum value (or special: see `mode`)
@@ -9,7 +10,7 @@ export interface StructureDef {
   loot?: boolean    // chest-loot estimation supported (xpple fork)
 }
 
-const ICON = (name: string) => `/icons/structures/${name}.webp`
+const ICON = (name: string) => asset(`icons/structures/${name}.webp`)
 
 // Synthetic def for zombie (abandoned) villages — same cubiomes Village type, but
 // rendered with a distinct icon. Not a separate filter toggle.

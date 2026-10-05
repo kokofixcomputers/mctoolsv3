@@ -12,6 +12,7 @@
  * plain fallback chain without making a HEAD request.
  */
 import { useRef, useEffect, useCallback, useState } from 'react'
+import { asset } from '../lib/base'
 
 // ── GLSL ─────────────────────────────────────────────────────────────────────
 
@@ -825,10 +826,10 @@ export function BlockThumb({ name, version, model, size = 40, className, style }
 // ── URL helpers ───────────────────────────────────────────────────────────────
 
 export function blockRawUrl(version: string, name: string) {
-  return `/mc-assets/${version}/blocks/${name}.png`
+  return asset(`mc-assets/${version}/blocks/${name}.png`)
 }
 export function itemRawUrl(version: string, name: string) {
-  return `/mc-assets/${version}/items/${name}.png`
+  return asset(`mc-assets/${version}/items/${name}.png`)
 }
 
 /**
@@ -855,7 +856,7 @@ const _modelsCache = new Map<string, BlockModels>()
 async function fetchBlockModels(version: string): Promise<BlockModels> {
   if (_modelsCache.has(version)) return _modelsCache.get(version)!
   try {
-    const r = await fetch(`/mc-assets/${version}/blocks_models.json`)
+    const r = await fetch(asset(`mc-assets/${version}/blocks_models.json`))
     if (!r.ok) return {}
     const d = await r.json() as BlockModels
     _modelsCache.set(version, d)

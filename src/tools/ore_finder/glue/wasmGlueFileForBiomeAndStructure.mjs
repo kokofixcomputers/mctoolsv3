@@ -1,5 +1,5 @@
 // Top of file (browser)
-const wasmUrl = "/wasm/structuresAndBiomes.wasm";
+const wasmUrl = import.meta.env.BASE_URL + "wasm/structuresAndBiomes.wasm";
 
 const wasmbinPromise = (async () => {
   const resp = await fetch(wasmUrl);

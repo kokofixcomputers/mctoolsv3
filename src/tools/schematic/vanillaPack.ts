@@ -1,3 +1,4 @@
+import { asset } from '../../lib/base'
 // Supplies a vanilla Minecraft resource pack (blockstates + models + textures) to
 // the 3D schematic renderer. Without it, Cubane can't resolve block models and every
 // block renders as an empty fallback.
@@ -9,7 +10,7 @@
 //
 // The result is cached at module scope so it's only fetched once per session.
 
-const LOCAL_PACK_URL = '/packs/vanilla-1.21.1.zip'
+const LOCAL_PACK_URL = asset('packs/vanilla-1.21.1.zip')
 const MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
 
 interface ManifestEntry { id: string; url: string }

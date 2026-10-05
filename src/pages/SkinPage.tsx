@@ -5,6 +5,7 @@ import {
   Brush, Eraser, PaintBucket, Pipette, Hand,
   Undo2, Redo2, Download, Upload, RotateCcw, Grid3x3, Layers, EyeOff,
 } from 'lucide-react'
+import { asset } from '../lib/base'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Tool = 'brush' | 'erase' | 'fill' | 'eyedrop' | 'hand'
@@ -308,7 +309,7 @@ export default function SkinPage() {
     const sc = skinCanvasRef.current
     sc.width = sc.height = 64
     const ctx = sc.getContext('2d')!
-    loadSkinImage('/steve.png', ctx).then(() => {
+    loadSkinImage(asset('steve.png'), ctx).then(() => {
       if (skinTextureRef.current) skinTextureRef.current.needsUpdate = true
       saveUndo()
       update2D()
@@ -846,7 +847,7 @@ export default function SkinPage() {
 
   function handleReset() {
     const ctx = skinCanvasRef.current.getContext('2d')!
-    loadSkinImage('/steve.png', ctx).then(() => {
+    loadSkinImage(asset('steve.png'), ctx).then(() => {
       if (skinTextureRef.current) skinTextureRef.current.needsUpdate = true
       update2D()
       saveUndo()

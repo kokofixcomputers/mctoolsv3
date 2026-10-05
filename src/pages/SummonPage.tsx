@@ -7,6 +7,7 @@ import {
   newEntity, newEquip, newEffect, newAttr, buildCommand, eraFor, FLAGS, MOBS, ITEMS, EFFECTS, ATTRIBUTES,
   type SummonEntity, type EntityMode, type EquipItem, type Effect, type Attr,
 } from '../tools/summon/summon'
+import { RunBtn } from '../components/RunBtn'
 
 const VERSIONS = ['26.2', '26.1', '1.21.11', '1.21.9', '1.21.5', '1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20', '1.19.4', '1.18', '1.17', '1.16.5', '1.15', '1.14', '1.13', '1.12', '1.8', '1.7']
 const ERA_LABEL: Record<string, string> = {
@@ -85,11 +86,14 @@ export default function SummonPage() {
               <h3 className="flex items-center gap-2" style={{ color: 'rgb(var(--text))' }}>
                 <Terminal className="w-4 h-4" style={{ color: 'rgb(var(--accent))' }} /> Command
               </h3>
+              <div className="flex items-center gap-2">
+              <RunBtn text={command} className="!px-3 !py-1.5 !text-xs" />
               <button
                 onClick={async () => { await navigator.clipboard.writeText(command); setCopied(true); setTimeout(() => setCopied(false), 1200) }}
                 className="btn-primary !px-3 !py-1.5 !text-xs">
                 {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
               </button>
+              </div>
             </div>
             <pre className="output-box max-h-[60vh] overflow-auto" style={{ whiteSpace: 'pre-wrap' }}>{command}</pre>
           </div>

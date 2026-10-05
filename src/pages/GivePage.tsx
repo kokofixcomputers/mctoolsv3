@@ -24,6 +24,7 @@ import {
 } from '../tools/give/giveCommand'
 import { VERSIONS, GLOBAL_VERSION_FORMAT } from '../tools/give/versions'
 import { useVersion } from '../contexts/VersionContext'
+import { RunBtn } from '../components/RunBtn'
 
 // ── constants ────────────────────────────────────────────────────────────────
 
@@ -92,7 +93,10 @@ function OutputCard({ command, error }: { command: string; error: string }) {
     <div className="card sticky top-20">
       <div className="flex items-center justify-between mb-4">
         <h3>Command</h3>
-        <CopyBtn text={command} />
+        <div className="flex items-center gap-2">
+          <RunBtn text={command} />
+          <CopyBtn text={command} />
+        </div>
       </div>
       {error
         ? <div className="alert-danger text-sm">{error}</div>

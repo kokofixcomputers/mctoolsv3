@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import JSZip from 'jszip'
 import { TEXTURE_CATEGORIES, type TextureCategory } from '../tools/resourcepack/textureManifest'
+import { asset } from '../lib/base'
 
 const VERSION = '1.21.7'
 const DISPLAY_SIZE = 512
@@ -378,7 +379,7 @@ export default function ResourcePackPage() {
   const loadVanillaTexture = useCallback(async (cat: TextureCategory, path: string, label: string) => {
     setLoadingTex(true)
     try {
-      const url = `/mc-assets/${VERSION}/${cat.assetPath}/${path}`
+      const url = asset(`mc-assets/${VERSION}/${cat.assetPath}/${path}`)
       const { px, w, h } = await loadImagePixels(url)
       undoStack.current = []; redoStack.current = []
       setHistLen(0); setFutureLen(0)
@@ -619,7 +620,7 @@ export default function ResourcePackPage() {
                     }}
                   >
                     <img
-                      src={`/mc-assets/${VERSION}/${entry.cat.assetPath}/${entry.path}`}
+                      src={asset(`mc-assets/${VERSION}/${entry.cat.assetPath}/${entry.path}`)}
                       alt={entry.label}
                       style={{ width: '100%', height: '100%', objectFit: 'contain', imageRendering: 'pixelated' }}
                       onError={e => { (e.target as HTMLImageElement).style.opacity = '0.2' }}

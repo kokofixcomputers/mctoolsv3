@@ -1,4 +1,5 @@
-export const ASSET_BASE = '/mc-assets/1.21.11'
+import { asset } from '../../lib/base'
+export const ASSET_BASE = asset('mc-assets/1.21.11')
 export const ITEM = (id: string) => `${ASSET_BASE}/items/${id}.png`
 
 export interface Enchantment {

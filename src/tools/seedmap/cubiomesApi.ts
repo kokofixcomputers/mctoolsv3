@@ -1,3 +1,4 @@
+import { asset } from '../../lib/base'
 // Browser wrapper around the cubiomes WASM build (compiled from the C library).
 // Exposes biome generation, biome colours/names, and structure finding.
 
@@ -20,7 +21,7 @@ let spawnPtr = 0
 async function ensure(): Promise<void> {
   if (ready) return ready
   ready = (async () => {
-    const buf = await fetch('/wasm/cubiomes.wasm').then(r => {
+    const buf = await fetch(asset('wasm/cubiomes.wasm')).then(r => {
       if (!r.ok) throw new Error(`cubiomes.wasm ${r.status}`)
       return r.arrayBuffer()
     })

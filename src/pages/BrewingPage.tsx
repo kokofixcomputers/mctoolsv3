@@ -3,6 +3,7 @@ import { ArrowRight, FlaskConical, Droplets, Copy, Check } from 'lucide-react'
 import {
   POTIONS, byId, buildSteps, modifiersFor, ITEM, ASSET_BASE, pretty, giveCommand,
 } from '../tools/brewing/recipes'
+import { RunBtn } from '../components/RunBtn'
 
 // ── tinted potion icon (overlay liquid tinted + glass on top) ─────────────────────────
 let basesPromise: Promise<{ glass: HTMLImageElement; overlay: HTMLImageElement }> | null = null
@@ -157,10 +158,13 @@ export default function BrewingPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm" style={{ color: 'rgb(var(--text))' }}>/give command <span className="text-xs font-normal" style={{ color: 'rgb(var(--muted))' }}>(1.20.5+, OP)</span></h3>
+              <div className="flex items-center gap-2">
+              <RunBtn text={giveCommand(potion)} className="!px-3 !py-1.5 !text-xs" />
               <button onClick={copyGive} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all"
                 style={{ background: 'rgb(var(--accent) / 0.1)', color: 'rgb(var(--accent))' }}>
                 {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
               </button>
+              </div>
             </div>
             <pre className="text-sm font-mono break-all whitespace-pre-wrap rounded-xl px-4 py-3"
               style={{ background: 'rgb(var(--bg))', border: '1px solid rgb(var(--border))', color: 'rgb(var(--text))' }}>

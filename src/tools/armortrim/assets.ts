@@ -1,4 +1,5 @@
-const ASSET_BASE = '/mc-assets/1.21.11'
+import { asset } from '../../lib/base'
+const ASSET_BASE = asset('mc-assets/1.21.11')
 
 const glob = (pattern: Record<string, string>) => {
   const out: Record<string, string> = {}

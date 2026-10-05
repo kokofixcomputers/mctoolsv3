@@ -1,6 +1,7 @@
+import { asset } from '../../lib/base'
 // Brewing reference data. Colours are the approximate vanilla potion tints.
 
-export const ASSET_BASE = '/mc-assets/1.21.11'
+export const ASSET_BASE = asset('mc-assets/1.21.11')
 export const ITEM = (id: string) => `${ASSET_BASE}/items/${id}.png`
 export const pretty = (id: string) => id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 

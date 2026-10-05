@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, HashRouter, Navigate, Routes, Route } from 'react-router-dom'
+import { embedded } from './lib/panel'
 import { VersionProvider } from './contexts/VersionContext'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
@@ -42,13 +43,16 @@ import EnchantingPage from './pages/EnchantingPage'
 import ColorMatchPage from './pages/ColorMatchPage'
 import TellrawPage from './pages/TellrawPage'
 
+// The panel serves this as static files without a fallback to index.html, so inside it routes live in the hash.
+const Router = embedded ? HashRouter : BrowserRouter
+
 export default function App() {
   return (
     <VersionProvider>
-      <BrowserRouter>
+      <Router>
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<HomePage />} />
+            <Route index element={embedded ? <Navigate to="/tools" replace /> : <HomePage />} />
             <Route path="tools" element={<ToolsPage />} />
             <Route path="gradient" element={<GradientPage />} />
             <Route path="motd" element={<MotdPage />} />
@@ -90,7 +94,7 @@ export default function App() {
             <Route path="tellraw" element={<TellrawPage />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </Router>
     </VersionProvider>
   )
 }

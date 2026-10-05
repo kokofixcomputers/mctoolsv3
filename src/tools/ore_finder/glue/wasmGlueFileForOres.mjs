@@ -1,7 +1,7 @@
 // Browser-compatible glue for orefinder.gg wasm
 // IMPORTANT: Place ores.wasm where your bundler serves it, e.g. public/wasm/ores.wasm
 // and adjust this path if needed.
-var E = "/wasm/ores.wasm";
+var E = import.meta.env.BASE_URL + "wasm/ores.wasm";
 
 // Patched loader: data: URLs unchanged, http(s) and relative paths via fetch
 async function k(e = {}, _) {

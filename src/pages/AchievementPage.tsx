@@ -22,6 +22,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Download, Copy, Check, Search } from 'lucide-react'
 import { useVersion } from '../contexts/VersionContext'
 import { itemRawUrl, blockRawUrl } from '../components/BlockRenderer'
+import { asset } from '../lib/base'
 
 // ── Font ──────────────────────────────────────────────────────────────────────
 
@@ -253,7 +254,7 @@ async function renderToCanvas(
   drawToastBg(ctx, W, H, S)
 
   // ── Icon frame (actual game sprite, 26×26 gp) ──
-  const frameUrl = `/mc-assets/${version}/gui/sprites/advancements/${toast.frameName}.png`
+  const frameUrl = asset(`mc-assets/${version}/gui/sprites/advancements/${toast.frameName}.png`)
   const frameImg = await loadImg([frameUrl])
   const fSz = FRAME_SZ * S
   const fX  = BORDER * S

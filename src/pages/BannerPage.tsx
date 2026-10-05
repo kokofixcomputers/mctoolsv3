@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useId } from 'react'
 import { Plus, Trash2, ChevronUp, ChevronDown, Copy, Check, AlertTriangle } from 'lucide-react'
 import { useVersion } from '../contexts/VersionContext'
+import { RunBtn } from '../components/RunBtn'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Layer { id: string; pattern: string; color: string }
@@ -732,10 +733,13 @@ export default function BannerPage() {
                 <p className="font-semibold uppercase tracking-widest text-xs" style={{ color: 'rgb(var(--muted))' }}>
                   COMMAND <span className="badge badge-accent ml-2">{version.label}</span>
                 </p>
+                <div className="flex items-center gap-2">
+                <RunBtn text={command} className="!px-3 !py-1.5 !text-xs" />
                 <button onClick={copyCommand} className="btn btn-primary px-3 py-1.5 text-xs gap-1.5">
                   {copied ? <Check size={13} /> : <Copy size={13} />}
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
+                </div>
               </div>
               <pre
                 className="output-box text-xs break-all whitespace-pre-wrap"

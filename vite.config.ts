@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import { mcAssetsPlugin } from './vite-plugin-mc-assets'
 
 export default defineConfig({
+  // "/tools/" when the panel serves the build next to itself, see the panel's tools/install-mctools.sh
+  base: process.env.VITE_BASE || '/',
   plugins: [react(), mcAssetsPlugin()],
   define: {
     global: 'globalThis',

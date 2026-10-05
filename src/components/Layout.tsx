@@ -2,6 +2,7 @@ import { Outlet, NavLink, Link } from 'react-router-dom'
 import { Pickaxe, Sun, Moon } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { VersionPicker } from './VersionPicker'
+import { embedded } from '../lib/panel'
 
 const NAV_ITEMS = [
   { to: '/tools',      label: 'Tools' },
@@ -18,7 +19,8 @@ export default function Layout() {
   const [dark, setDark] = useState(() =>
     typeof window !== 'undefined'
       ? document.documentElement.classList.contains('dark') ||
-        window.matchMedia('(prefers-color-scheme: dark)').matches
+        // The panel is light, so the embedded tools start out light as well.
+        (!embedded && window.matchMedia('(prefers-color-scheme: dark)').matches)
       : false
   )
 
@@ -31,7 +33,7 @@ export default function Layout() {
       <header className="navbar-float">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 font-semibold tracking-tight shrink-0">
+          <Link to={embedded ? '/tools' : '/'} className="flex items-center gap-2.5 font-semibold tracking-tight shrink-0">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet-500 via-purple-500 to-blue-500 text-white">
               <Pickaxe className="w-4 h-4" />
             </span>
@@ -77,10 +79,10 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <footer className="border-t py-6 text-center text-xs mt-8"
+      {!embedded && <footer className="border-t py-6 text-center text-xs mt-8"
         style={{ borderColor: 'rgb(var(--border))', color: 'rgb(var(--muted))' }}>
         Created by kokodev.
-      </footer>
+      </footer>}
     </div>
   )
 }

@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { nearestVersion, usePanel } from '../lib/panel'
 
 export interface McVersion {
   id: string
@@ -23,6 +24,15 @@ const Ctx = createContext<VersionCtx>({
 
 export function VersionProvider({ children }: { children: ReactNode }) {
   const [version, setVersion] = useState<McVersion>(MC_VERSIONS[1])
+  const panel = usePanel()
+
+  // Inside the panel, start on the supported version closest to the one the server runs. Choosing another one by hand
+  // sticks until the panel reports a different server version.
+  useEffect(() => {
+    const match = nearestVersion(panel.version, MC_VERSIONS)
+    if (match) setVersion(match)
+  }, [panel.version])
+
   return <Ctx.Provider value={{ version, setVersion }}>{children}</Ctx.Provider>
 }
 
