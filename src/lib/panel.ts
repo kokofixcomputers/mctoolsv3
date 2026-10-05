@@ -4,14 +4,16 @@
  * The panel serves this app from its own address, so messages are only ever exchanged with the same origin. Without
  * ?embed=1 nothing here does anything and the app behaves like the standalone site.
  *
- * panel -> app   { source: 'stratpanel', type: 'state', version, seed, running, canRun, server, software, players }
+ * panel -> app   { source: 'stratpanel', type: 'state', version, seed, theme (see theme.ts), running, canRun, server, software, players }
  * app -> panel   { source: 'mctools', type: 'ready' }
  * app -> panel   { source: 'mctools', type: 'run', id, commands: string[] }
  * panel -> app   { source: 'stratpanel', type: 'run-result', id, ok, error? }
  * app -> panel   { source: 'mctools', type: 'save-property', id, key, value }   (only key "motd" is accepted)
- * panel -> app   { source: 'stratpanel', type: 'save-result', id, ok, error? }
+ * app -> panel   { source: 'mctools', type: 'save-schematic', id, name, data: ArrayBuffer }   (a gzipped .schem)
+ * panel -> app   { source: 'stratpanel', type: 'save-result', id, ok, error?, path? }
  */
 import { useEffect, useSyncExternalStore } from 'react'
+import { applyTheme, type PanelTheme } from './theme'
 
 export interface PanelState {
   /** True once the panel answered; false for the standalone site and while waiting. */
@@ -28,6 +30,8 @@ export interface PanelState {
   canRun: boolean
   /** The signed in user may change the server's files. */
   canEdit: boolean
+  /** The folder WorldEdit loads schematics from, set only when WorldEdit is installed on the server. */
+  worldEdit?: string
   players: string[]
 }
 
@@ -36,7 +40,7 @@ export const embedded: boolean =
 
 let state: PanelState = { connected: false, running: false, canRun: false, canEdit: false, players: [] }
 const listeners = new Set<() => void>()
-const pending = new Map<string, { resolve: () => void; reject: (e: Error) => void; timer: number }>()
+const pending = new Map<string, { resolve: (path?: string) => void; reject: (e: Error) => void; timer: number }>()
 
 function set(next: Partial<PanelState>) {
   state = { ...state, ...next }
@@ -56,6 +60,7 @@ if (embedded) {
     if (!data || data.source !== 'stratpanel') return
 
     if (data.type === 'state') {
+      applyTheme(data.theme && typeof data.theme === 'object' ? (data.theme as PanelTheme) : undefined)
       set({
         connected: true,
         version: typeof data.version === 'string' ? data.version : undefined,
@@ -65,6 +70,7 @@ if (embedded) {
         running: !!data.running,
         canRun: !!data.canRun,
         canEdit: !!data.canEdit,
+        worldEdit: typeof data.worldEdit === 'string' && data.worldEdit ? data.worldEdit : undefined,
         players: Array.isArray(data.players) ? data.players.map(String) : [],
       })
     } else if (data.type === 'run-result' || data.type === 'save-result') {
@@ -72,7 +78,7 @@ if (embedded) {
       if (!waiting) return
       pending.delete(data.id)
       window.clearTimeout(waiting.timer)
-      if (data.ok) waiting.resolve()
+      if (data.ok) waiting.resolve(typeof data.path === 'string' ? data.path : undefined)
       else waiting.reject(new Error(data.error || 'The panel could not run the command'))
     }
   })
@@ -119,7 +125,7 @@ export function runCommands(commands: string[]): Promise<void> {
       pending.delete(id)
       reject(new Error('The panel did not answer'))
     }, 8000)
-    pending.set(id, { resolve, reject, timer })
+    pending.set(id, { resolve: () => resolve(), reject, timer })
     post({ type: 'run', id, commands })
   })
 }
@@ -134,8 +140,24 @@ export function saveProperty(key: 'motd', value: string): Promise<void> {
       pending.delete(id)
       reject(new Error('The panel did not answer'))
     }, 15000)
-    pending.set(id, { resolve, reject, timer })
+    pending.set(id, { resolve: () => resolve(), reject, timer })
     post({ type: 'save-property', id, key, value })
+  })
+}
+
+/** Saves a schematic into WorldEdit's schematics folder on the server. Resolves with the path it was saved to. */
+export function saveSchematic(name: string, bytes: Uint8Array): Promise<string> {
+  if (!embedded || !state.connected || !state.worldEdit) return Promise.reject(new Error('WorldEdit is not installed'))
+  const id = Math.random().toString(36).slice(2)
+  const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+
+  return new Promise<string>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      pending.delete(id)
+      reject(new Error('The panel did not answer'))
+    }, 30000)
+    pending.set(id, { resolve: (path) => resolve(path ?? ''), reject, timer })
+    post({ type: 'save-schematic', id, name, data })
   })
 }
 

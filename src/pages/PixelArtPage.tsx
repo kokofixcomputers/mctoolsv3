@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Upload, Download, ZoomIn, ZoomOut, Maximize2, RefreshCw } from 'lucide-react'
 import { NbtWriter, varint, gzip } from '../tools/circle/nbtWriter'
 import { downloadBlob } from '../tools/circle/schematic'
+import { SaveSchematicBtn } from '../components/SaveSchematicBtn'
 import { useVersion } from '../contexts/VersionContext'
 
 // ── Block palette ──────────────────────────────────────────────────────────────
@@ -721,6 +722,11 @@ export default function PixelArtPage() {
                 <Download className="w-4 h-4" />
                 {exporting ? 'Building…' : 'WorldEdit Schematic (.schem)'}
               </button>
+              <SaveSchematicBtn
+                name={imgName || 'pixel-art'}
+                disabled={!blockIndices || palette.length === 0}
+                build={() => buildPixelSchematic(blockIndices!, palette, targetW, targetH, imgName || 'pixel-art', version.id, orientation)}
+              />
             </div>
             <p className="text-xs" style={{ color: 'rgb(var(--muted))' }}>
               {orientation === 'wall'

@@ -17,6 +17,18 @@
   --success: 22 163 74;
   --danger:  220 38  38;
   --warning: 202 138  4;
+  /* Tailwind's violet scale, the tools' own palette. The panel can swap the whole scale, see src/lib/theme.ts */
+  --violet-50: 245 243 255;
+  --violet-100: 237 233 254;
+  --violet-200: 221 214 254;
+  --violet-300: 196 181 253;
+  --violet-400: 167 139 250;
+  --violet-500: 139 92 246;
+  --violet-600: 124 58 237;
+  --violet-700: 109 40 217;
+  --violet-800: 91 33 182;
+  --violet-900: 76 29 149;
+  --violet-950: 46 16 101;
 }
 
 .dark {
