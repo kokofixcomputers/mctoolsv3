@@ -7,6 +7,7 @@ import {
   type Dim, type SeedParts, type FoundStructure, type LootChest,
 } from '../tools/seedmap/cubiomesApi'
 import { STRUCTURES, ZOMBIE_VILLAGE_DEF, type StructureDef } from '../tools/seedmap/structures'
+import { usePanelSeed } from '../lib/panel'
 
 const VERSIONS = ['26.2', '26.1', '1.21.11', '1.21.9', '1.21.5', '1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20', '1.19.4', '1.18', '1.17', '1.16.5', '1.15', '1.14', '1.13', '1.12', '1.8', '1.7']
 // Block-Y presets for sampling — cave biomes (sulfur caves, lush, deep dark…) only
@@ -43,6 +44,7 @@ export default function SeedMapPage() {
 
   const [searchParams] = useSearchParams()
   const [seedInput, setSeedInput] = useState(() => searchParams.get('seed') || '1231234')
+  usePanelSeed(setSeedInput)
   const [version, setVersion] = useState(() => {
     const v = searchParams.get('v')
     return v && VERSIONS.includes(v) ? v : '1.21.11'

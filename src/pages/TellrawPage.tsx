@@ -6,6 +6,7 @@ import { segmentStyle, type RichLine, type TextEvents, type TextSegment } from '
 import { useVersion } from '../contexts/VersionContext'
 import { buildTellraw, tellrawFormatFor } from '../tools/tellraw/tellraw'
 import { RunBtn } from '../components/RunBtn'
+import { TargetInput } from '../components/TargetInput'
 
 function uid() { return Math.random().toString(36).slice(2) }
 
@@ -307,10 +308,11 @@ export default function TellrawPage() {
                   {TARGETS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                 </select>
                 {target === 'custom' && (
-                  <input
-                    className="form-input mt-2 font-mono text-sm"
+                  <TargetInput
+                    wrapperClassName="mt-2"
+                    className="form-input font-mono text-sm"
                     value={customTarget}
-                    onChange={e => setCustomTarget(e.target.value)}
+                    onChange={setCustomTarget}
                     placeholder="Steve or @a[team=red]"
                   />
                 )}

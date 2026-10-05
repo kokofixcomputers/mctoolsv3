@@ -25,6 +25,7 @@ import {
 import { VERSIONS, GLOBAL_VERSION_FORMAT } from '../tools/give/versions'
 import { useVersion } from '../contexts/VersionContext'
 import { RunBtn } from '../components/RunBtn'
+import { TargetInput } from '../components/TargetInput'
 
 // ── constants ────────────────────────────────────────────────────────────────
 
@@ -268,7 +269,7 @@ function ItemGenerator() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="form-label">Target</label>
-              <input className="form-input" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="@p" />
+              <TargetInput className="form-input" value={target} onChange={setTarget} placeholder="@p" />
               <div className="flex gap-1 mt-1.5">
                 {['@p','@s','@a'].map((t) => (
                   <button key={t} onClick={() => setTarget(t)} className="btn-ghost rounded-lg px-2 py-0.5 text-xs">{t}</button>
@@ -563,7 +564,7 @@ function FoodGenerator() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="form-label">Target</label>
-              <input className="form-input" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="@p" />
+              <TargetInput className="form-input" value={target} onChange={setTarget} placeholder="@p" />
             </div>
             <div>
               <label className="form-label">Item ID</label>

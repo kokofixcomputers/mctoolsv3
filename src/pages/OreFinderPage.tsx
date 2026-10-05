@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { Copy, Check, AlertTriangle, FlaskConical, Shield } from 'lucide-react'
 import { ORE_TYPES } from '../tools/ore_finder/finder'
+import { usePanelSeed } from '../lib/panel'
 
 const VERSIONS = ['1.21.8','1.21.7','1.21.6','1.21.5','1.21.4','1.21.2','1.21','1.20','1.19','1.18']
 const SOFT_CAP = 5000 // recommended max; higher is allowed but warned
@@ -34,6 +35,7 @@ function CopyTpBtn({ cluster }: { cluster: Cluster }) {
 
 export default function OreFinderPage() {
   const [seed, setSeed] = useState('')
+  usePanelSeed(setSeed)
   const [x, setX] = useState('0')
   const [z, setZ] = useState('0')
   const [radius, setRadius] = useState('5')

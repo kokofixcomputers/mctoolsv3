@@ -14,16 +14,19 @@ export function RunBtn({ text, disabled, className = '' }: { text: string; disab
 
   if (!embedded || !panel.connected) return null
 
-  // The console is nobody, so "@s" and "@p" mean nothing there. Offer the online players to run it as.
-  const needsPlayer = /@[sp]\b/.test(text)
-  const target = panel.players.includes(player) ? player : panel.players[0] || ''
-  const commands = toCommands(needsPlayer && target ? text.replace(/@[sp]\b/g, target) : text)
+  // The console is nobody, so "@s" means nothing there and "@p" is the nearest to the world spawn. Offer the players the
+  // panel knows about to run it as. The panel only learns about players who joined while it was open, so the list can
+  // be empty even with people online, which only matters for "@s".
+  const hasSelf = /@s\b/.test(text)
+  const hasNearest = /@p\b/.test(text)
+  const target = panel.players.includes(player) ? player : hasSelf ? panel.players[0] || '' : ''
+  const commands = toCommands(target ? text.replace(/@[sp]\b/g, target) : text)
   const blocked = !panel.canRun
     ? 'You cannot send console commands on this server'
     : !panel.running
       ? 'The server is not running'
-      : needsPlayer && !target
-        ? 'This command targets @s or @p, so a player has to be online to run it as'
+      : hasSelf && !target
+        ? 'This runs as @s, which the console is not. Join the server or change the target to a player name or @p'
         : ''
 
   const run = async () => {
@@ -42,7 +45,7 @@ export function RunBtn({ text, disabled, className = '' }: { text: string; disab
 
   return (
     <span className="inline-flex items-center gap-2">
-      {needsPlayer && panel.players.length > 0 && (
+      {(hasSelf || hasNearest) && panel.players.length > 0 && (
         <select
           value={target}
           onChange={(e) => setPlayer(e.target.value)}
@@ -50,6 +53,7 @@ export function RunBtn({ text, disabled, className = '' }: { text: string; disab
           className="rounded-lg px-2 py-2 text-sm"
           style={{ border: '1px solid rgb(var(--border))', backgroundColor: 'rgb(var(--panel))', color: 'rgb(var(--text))' }}
         >
+          {!hasSelf && <option value="">@p (nearest to spawn)</option>}
           {panel.players.map((name) => (
             <option key={name} value={name}>{name}</option>
           ))}
@@ -69,6 +73,7 @@ export function RunBtn({ text, disabled, className = '' }: { text: string; disab
         <><Play className="w-3.5 h-3.5" />Run</>
       )}
     </button>
+    {blocked && <span className="text-xs max-w-[16rem]" style={{ color: 'rgb(var(--muted))' }}>{blocked}</span>}
     </span>
   )
 }

@@ -4,12 +4,12 @@
  * The panel serves this app from its own address, so messages are only ever exchanged with the same origin. Without
  * ?embed=1 nothing here does anything and the app behaves like the standalone site.
  *
- * panel -> app   { source: 'stratpanel', type: 'state', version, running, canRun, server, software, players }
+ * panel -> app   { source: 'stratpanel', type: 'state', version, seed, running, canRun, server, software, players }
  * app -> panel   { source: 'mctools', type: 'ready' }
  * app -> panel   { source: 'mctools', type: 'run', id, commands: string[] }
  * panel -> app   { source: 'stratpanel', type: 'run-result', id, ok, error? }
  */
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 
 export interface PanelState {
   /** True once the panel answered; false for the standalone site and while waiting. */
@@ -18,6 +18,8 @@ export interface PanelState {
   version?: string
   software?: string
   server?: string
+  /** The seed of the server's world as text (it can need all 64 bits), read from the world files. */
+  seed?: string
   /** The server is online. */
   running: boolean
   /** The signed in user may send console commands. */
@@ -53,6 +55,7 @@ if (embedded) {
         version: typeof data.version === 'string' ? data.version : undefined,
         software: typeof data.software === 'string' ? data.software : undefined,
         server: typeof data.server === 'string' ? data.server : undefined,
+        seed: typeof data.seed === 'string' && data.seed ? data.seed : undefined,
         running: !!data.running,
         canRun: !!data.canRun,
         players: Array.isArray(data.players) ? data.players.map(String) : [],
@@ -77,6 +80,18 @@ export function usePanel(): PanelState {
     },
     () => state,
   )
+}
+
+/**
+ * Fills a seed field with the seed of the server's world once the panel has read it. It runs again only when the seed
+ * changes, so anything typed in the meantime stays.
+ */
+export function usePanelSeed(apply: (seed: string) => void) {
+  const { seed } = usePanel()
+  useEffect(() => {
+    if (seed) apply(seed)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed])
 }
 
 /** Splits generated output into console commands: one per line, no leading slash, comments and blanks dropped. */

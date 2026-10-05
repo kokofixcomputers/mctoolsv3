@@ -8,6 +8,7 @@ import {
   type SummonEntity, type EntityMode, type EquipItem, type Effect, type Attr,
 } from '../tools/summon/summon'
 import { RunBtn } from '../components/RunBtn'
+import { TargetInput } from '../components/TargetInput'
 
 const VERSIONS = ['26.2', '26.1', '1.21.11', '1.21.9', '1.21.5', '1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20', '1.19.4', '1.18', '1.17', '1.16.5', '1.15', '1.14', '1.13', '1.12', '1.8', '1.7']
 const ERA_LABEL: Record<string, string> = {
@@ -67,7 +68,7 @@ export default function SummonPage() {
         ) : (
           <div className="flex items-center gap-2">
             <span className="text-sm" style={{ color: 'rgb(var(--muted))' }}>To</span>
-            <input className="form-input font-mono text-sm !w-24 !py-2" value={target} onChange={e => setTarget(e.target.value)} placeholder="@p" />
+            <TargetInput className="form-input font-mono text-sm !w-24 !py-2" value={target} onChange={setTarget} placeholder="@p" />
           </div>
         )}
         <span className="badge-muted ml-auto font-mono">{ERA_LABEL[era]}</span>

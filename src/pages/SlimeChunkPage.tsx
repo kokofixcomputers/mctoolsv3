@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Download, Link, X, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react'
+import { usePanelSeed } from '../lib/panel'
 
 // ── Java LCG slime chunk algorithm ────────────────────────────────────────────
 // Implements: new Random(seed + cx²×4987142 + cx×5947611 + cz²×4392871 + cz×389711 ^ 987234911).nextInt(10) == 0
@@ -234,6 +235,7 @@ void PACK_FORMATS_UNUSED
 export default function SlimeChunkPage() {
   const [seedInput, setSeedInput] = useState('12345')
   const [seedBig, setSeedBig] = useState(12345n)
+  usePanelSeed((s) => { setSeedInput(s); setSeedBig(parseSeedInput(s)) })
   const [centerX, setCenterX] = useState(0)
   const [centerZ, setCenterZ] = useState(0)
   const [radius, setRadius] = useState(16)
