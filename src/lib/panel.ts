@@ -8,6 +8,8 @@
  * app -> panel   { source: 'mctools', type: 'ready' }
  * app -> panel   { source: 'mctools', type: 'run', id, commands: string[] }
  * panel -> app   { source: 'stratpanel', type: 'run-result', id, ok, error? }
+ * app -> panel   { source: 'mctools', type: 'save-property', id, key, value }   (only key "motd" is accepted)
+ * panel -> app   { source: 'stratpanel', type: 'save-result', id, ok, error? }
  */
 import { useEffect, useSyncExternalStore } from 'react'
 
@@ -24,13 +26,15 @@ export interface PanelState {
   running: boolean
   /** The signed in user may send console commands. */
   canRun: boolean
+  /** The signed in user may change the server's files. */
+  canEdit: boolean
   players: string[]
 }
 
 export const embedded: boolean =
   typeof window !== 'undefined' && window.parent !== window && new URLSearchParams(window.location.search).has('embed')
 
-let state: PanelState = { connected: false, running: false, canRun: false, players: [] }
+let state: PanelState = { connected: false, running: false, canRun: false, canEdit: false, players: [] }
 const listeners = new Set<() => void>()
 const pending = new Map<string, { resolve: () => void; reject: (e: Error) => void; timer: number }>()
 
@@ -60,9 +64,10 @@ if (embedded) {
         seed: typeof data.seed === 'string' && data.seed ? data.seed : undefined,
         running: !!data.running,
         canRun: !!data.canRun,
+        canEdit: !!data.canEdit,
         players: Array.isArray(data.players) ? data.players.map(String) : [],
       })
-    } else if (data.type === 'run-result') {
+    } else if (data.type === 'run-result' || data.type === 'save-result') {
       const waiting = pending.get(data.id)
       if (!waiting) return
       pending.delete(data.id)
@@ -116,6 +121,21 @@ export function runCommands(commands: string[]): Promise<void> {
     }, 8000)
     pending.set(id, { resolve, reject, timer })
     post({ type: 'run', id, commands })
+  })
+}
+
+/** Asks the panel to write one value into server.properties. Resolves once it is saved, the server needs a restart. */
+export function saveProperty(key: 'motd', value: string): Promise<void> {
+  if (!embedded || !state.connected) return Promise.reject(new Error('Not running inside the panel'))
+  const id = Math.random().toString(36).slice(2)
+
+  return new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      pending.delete(id)
+      reject(new Error('The panel did not answer'))
+    }, 15000)
+    pending.set(id, { resolve, reject, timer })
+    post({ type: 'save-property', id, key, value })
   })
 }
 

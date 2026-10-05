@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
-import { Plus, Copy, Check } from 'lucide-react'
+import { Plus, Copy, Check, Save } from 'lucide-react'
+import { embedded, saveProperty, usePanel } from '../lib/panel'
 import { buildMotdFromRich, type MotdFormat } from '../tools/motd/motd'
 import { RichLineEditor } from '../components/RichTextEditor'
 import type { RichLine } from '../types/richText'
@@ -22,6 +23,60 @@ function CopyBtn({ text }: { text: string }) {
     <button onClick={copy} className="btn-secondary px-4 py-2 text-xs flex items-center gap-1.5">
       {copied ? <><Check className="w-3 h-3" />Copied</> : <><Copy className="w-3 h-3" />Copy</>}
     </button>
+  )
+}
+
+/** server.properties keeps non-ASCII characters (the section sign of the color codes) as \uXXXX escapes. */
+function toPropertyValue(output: string) {
+  return output
+    .replace(/^motd=/, '')
+    .replace(/[^\x20-\x7e]/g, (c) => `\\u${c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`)
+}
+
+/** Writes the MOTD into the server's server.properties through the panel. Only exists inside the panel. */
+function SaveBtn({ output, format }: { output: string; format: MotdFormat }) {
+  const panel = usePanel()
+  const [state, setState] = useState<'idle' | 'busy' | 'saved' | 'failed'>('idle')
+  const [error, setError] = useState('')
+
+  if (!embedded || !panel.connected) return null
+
+  const blocked = !panel.canEdit
+    ? 'You cannot edit files on this server'
+    : format !== 'vanilla'
+      ? 'Only the Vanilla (server.properties) format can be saved to the server'
+      : ''
+
+  const save = async () => {
+    setState('busy')
+    try {
+      await saveProperty('motd', toPropertyValue(output))
+      setState('saved')
+      setError('')
+    } catch (e) {
+      setState('failed')
+      setError((e as Error).message)
+    }
+    setTimeout(() => setState('idle'), 4000)
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      {state === 'saved' && (
+        <span className="text-xs" style={{ color: 'rgb(var(--muted))' }}>
+          {panel.running ? 'Saved. Restart the server to show it.' : 'Saved.'}
+        </span>
+      )}
+      {state === 'failed' && <span className="text-xs" style={{ color: 'rgb(var(--danger))' }}>{error}</span>}
+      <button
+        onClick={save}
+        disabled={!!blocked || state === 'busy'}
+        title={blocked || 'Write this MOTD into server.properties'}
+        className="btn-primary px-4 py-2 text-xs flex items-center gap-1.5"
+      >
+        {state === 'saved' ? <><Check className="w-3 h-3" />Saved</> : <><Save className="w-3 h-3" />Save to server</>}
+      </button>
+    </span>
   )
 }
 
@@ -100,7 +155,10 @@ export default function MotdPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h3>Output</h3>
-              <CopyBtn text={output} />
+              <div className="flex items-center gap-2">
+                <SaveBtn output={output} format={format} />
+                <CopyBtn text={output} />
+              </div>
             </div>
             <pre className="output-box text-xs overflow-x-auto whitespace-pre-wrap break-all">{output}</pre>
           </div>
