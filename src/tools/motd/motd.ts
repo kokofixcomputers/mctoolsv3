@@ -31,6 +31,16 @@ function centerLine(text: string, lineWidth = 53): string {
   return ' '.repeat(pad) + text
 }
 
+/**
+ * Spaces at the very start of a value are dropped when server.properties is read, and Pterodactyl's Wings and the server
+ * write the file again on every start, each time dropping what they can (an invisible reset code goes too). A colour in
+ * front of the spaces is not whitespace and means something, so it stays. This is the colour the server list uses for
+ * text that has none, so nothing changes for the text itself.
+ */
+function keepLeadingSpace(value: string): string {
+  return value.startsWith(' ') ? '§x§8§0§8§0§8§0' + value : value
+}
+
 export interface MotdLine {
   text: string
   useGradient: boolean
@@ -63,7 +73,7 @@ export function buildMotd(
 
   switch (format) {
     case 'vanilla':
-      return `motd=${joined.replace(/\n/g, '\\n')}`
+      return `motd=${keepLeadingSpace(joined.replace(/\n/g, '\\n'))}`
     case 'paper': {
       const yamlLines = rendered.map((l) => `  - "${l.replace(/"/g, '\\"')}"`)
       return `motd:\n${yamlLines.join('\n')}`
@@ -125,7 +135,7 @@ export function buildMotdFromRich(
 
   switch (format) {
     case 'vanilla':
-      return `motd=${rendered.join('\\n')}`
+      return `motd=${keepLeadingSpace(rendered.join('\\n'))}`
     case 'paper': {
       const yamlLines = rendered.map(l => `  - "${l.replace(/"/g, '\\"')}"`)
       return `motd:\n${yamlLines.join('\n')}`
