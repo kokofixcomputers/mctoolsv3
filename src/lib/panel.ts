@@ -10,6 +10,7 @@
  * panel -> app   { source: 'stratpanel', type: 'run-result', id, ok, error? }
  * app -> panel   { source: 'mctools', type: 'save-property', id, key, value }   (only key "motd" is accepted)
  * app -> panel   { source: 'mctools', type: 'save-schematic', id, name, data: ArrayBuffer }   (a gzipped .schem)
+ * app -> panel   { source: 'mctools', type: 'save-superflat', id, settings }   (generator-settings JSON, Superflat page only)
  * panel -> app   { source: 'stratpanel', type: 'save-result', id, ok, error?, path? }
  */
 import { useEffect, useSyncExternalStore } from 'react'
@@ -30,6 +31,8 @@ export interface PanelState {
   canRun: boolean
   /** The signed in user may change the server's files. */
   canEdit: boolean
+  /** generator-settings of the server's world as it is in server.properties, only sent to the Superflat editor. */
+  flat?: string
   /** The folder WorldEdit loads schematics from, set only when WorldEdit is installed on the server. */
   worldEdit?: string
   players: string[]
@@ -70,6 +73,7 @@ if (embedded) {
         running: !!data.running,
         canRun: !!data.canRun,
         canEdit: !!data.canEdit,
+        flat: typeof data.flat === 'string' && data.flat ? data.flat : undefined,
         worldEdit: typeof data.worldEdit === 'string' && data.worldEdit ? data.worldEdit : undefined,
         players: Array.isArray(data.players) ? data.players.map(String) : [],
       })
@@ -142,6 +146,21 @@ export function saveProperty(key: 'motd', value: string): Promise<void> {
     }, 15000)
     pending.set(id, { resolve: () => resolve(), reject, timer })
     post({ type: 'save-property', id, key, value })
+  })
+}
+
+/** Asks the panel to write the generator-settings of a Superflat world. Resolves once it is saved. */
+export function saveSuperflat(settings: string): Promise<void> {
+  if (!embedded || !state.connected) return Promise.reject(new Error('Not running inside the panel'))
+  const id = Math.random().toString(36).slice(2)
+
+  return new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      pending.delete(id)
+      reject(new Error('The panel did not answer'))
+    }, 15000)
+    pending.set(id, { resolve: () => resolve(), reject, timer })
+    post({ type: 'save-superflat', id, settings })
   })
 }
 

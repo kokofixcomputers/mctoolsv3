@@ -18,10 +18,12 @@ const NAV_ITEMS = [
 /** The slim bar in the panel: the way back to the list of tools and the Minecraft version. */
 function EmbedBar() {
   const { pathname } = useLocation()
+  // The panel opens one tool on its own with ?only, there is no list to go back to.
+  const single = new URLSearchParams(window.location.search).has('only')
 
   return (
     <div className="flex items-center justify-between gap-3 h-11">
-      {pathname !== '/tools' ? (
+      {pathname !== '/tools' && !single ? (
         <Link
           to="/tools"
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[rgb(var(--border)/0.5)]"

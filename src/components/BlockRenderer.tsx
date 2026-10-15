@@ -920,6 +920,17 @@ export async function resolveBlockSpriteUrl(version: string, name: string): Prom
   return (typeof url === 'string' && url) ? url : null
 }
 
+/** Every block id (without namespace) the textures of a version know, sorted. */
+export async function listBlockNames(version: string): Promise<string[]> {
+  const models = await fetchBlockModels(version)
+  const names = new Set<string>()
+  for (const key of Object.keys(models)) {
+    if (!models[key]?.textures && !models[key]?.elements) continue
+    names.add(key.replace(/_inventory$/, ''))
+  }
+  return [...names].sort()
+}
+
 /** React hook: true once blocks_models.json confirms this name is a Minecraft block. */
 export function useIsBlock(version: string, name: string): boolean | null {
   const [result, setResult] = useState<boolean | null>(null)
