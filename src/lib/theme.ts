@@ -2,19 +2,23 @@
  * Colors the panel hands over so the tools look like part of it. Every value is a hex color. Anything missing keeps the
  * tools' own color, and none of it applies on the standalone site.
  *
+ *   mode               'light' or 'dark': turns the tools' own dark styles (the .dark class) on or off
+ *   bg                 the color of the page behind the cards
  *   accent, accentFg   buttons, links, focus rings, and the text on a button
  *   text, muted        body text and the dimmer text
  *   panel, border      card background and outlines
  *   success, danger, warning
  *   scale              { 50: '#...', 100: ..., 950: ... } replaces the violet shades the tools use for highlights
  */
-export type PanelTheme = Partial<Record<'accent' | 'accentFg' | 'text' | 'muted' | 'panel' | 'border' | 'success' | 'danger' | 'warning', string>> & {
+export type PanelTheme = Partial<Record<'accent' | 'accentFg' | 'bg' | 'text' | 'muted' | 'panel' | 'border' | 'success' | 'danger' | 'warning', string>> & {
+  mode?: 'light' | 'dark'
   scale?: Record<string, string>
 }
 
 const VARIABLES: Record<string, string> = {
   accent: '--accent',
   accentFg: '--accent-fg',
+  bg: '--bg',
   text: '--text',
   muted: '--muted',
   panel: '--panel',
@@ -39,6 +43,11 @@ const applied = new Set<string>()
 /** Sets the colors on the document. Colors that are no longer in the theme go back to the stylesheet's value. */
 export function applyTheme(theme: PanelTheme | undefined) {
   const root = document.documentElement
+  // Without a mode the tools keep what they have (the standalone site, an older panel).
+  if (theme?.mode === 'dark' || theme?.mode === 'light') {
+    root.classList.toggle('dark', theme.mode === 'dark')
+    root.style.colorScheme = theme.mode
+  }
   const next = new Map<string, string>()
 
   for (const [key, variable] of Object.entries(VARIABLES)) {
